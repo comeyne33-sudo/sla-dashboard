@@ -16,7 +16,8 @@ export const mockSLAs: SLA[] = [
     contactEmail: 'jan@portofantwerp.be',
     plannedQuarter: 'Q1',
     lat: 51.2194,
-    lng: 4.4025
+    lng: 4.4025,
+    lastUpdate: '2 min geleden'
   },
   {
     id: '2',
@@ -33,7 +34,8 @@ export const mockSLAs: SLA[] = [
     contactEmail: 'tech@uzgent.be',
     plannedQuarter: 'Q2',
     lat: 51.0543,
-    lng: 3.7174
+    lng: 3.7174,
+    lastUpdate: '5 min geleden'
   },
   {
     id: '3',
@@ -50,6 +52,7 @@ export const mockSLAs: SLA[] = [
     contactEmail: 'maintenance@brusselsairport.be',
     plannedQuarter: 'Q1',
     lat: 50.9000,
-    lng: 4.4833
+    lng: 4.4833,
+    lastUpdate: 'Zojuist'
   }
 ];
