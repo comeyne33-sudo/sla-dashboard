@@ -1,10 +1,9 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { mockSLAs } from '../../data/mockSLAs';
 import L from 'leaflet';
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react';
+import type { SLA } from '../../types/sla'; // <--- HIER ZAT DE FOUT
 
-// Fix voor de markers
 const createCustomIcon = (status: string) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#10b981';
   
@@ -28,10 +27,11 @@ const createCustomIcon = (status: string) => {
 };
 
 interface SLAMapProps {
+  data: SLA[];
   onBack: () => void;
 }
 
-export const SLAMap = ({ onBack }: SLAMapProps) => {
+export const SLAMap = ({ data, onBack }: SLAMapProps) => {
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   return (
@@ -65,13 +65,12 @@ export const SLAMap = ({ onBack }: SLAMapProps) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {mockSLAs.map((sla) => (
+          {data.map((sla) => (
             <Marker 
               key={sla.id} 
               position={[sla.lat, sla.lng]}
               icon={createCustomIcon(sla.status)}
             >
-              {/* HIER ZIT DE FIX: min-w-55 in plaats van min-w-[220px] */}
               <Popup className="min-w-55">
                 <div className="p-1 font-sans">
                   <div className="flex justify-between items-start mb-2">
