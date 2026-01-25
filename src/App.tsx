@@ -5,13 +5,12 @@ import { SLAList } from './components/dashboard/SLAList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
 import { mockSLAs } from './data/mockSLAs';
-import type { SLA } from './types/sla'; // Strict import
+import type { SLA } from './types/sla';
 
 type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
-  // Dit is de "Database" van je applicatie
   const [slaData, setSlaData] = useState<SLA[]>(mockSLAs);
 
   const handleAddSLA = (newData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
@@ -19,31 +18,39 @@ function App() {
       ...newData,
       id: (slaData.length + 1).toString(),
       status: 'active',
-      // Genereer een locatie rond Brussel (bij gebrek aan geocoding API)
       lat: 50.8503 + (Math.random() - 0.5) * 0.1,
       lng: 4.3517 + (Math.random() - 0.5) * 0.1,
       lastUpdate: 'Zojuist'
     };
-
     setSlaData([...slaData, newSLA]);
     setCurrentView('list');
+  };
+
+  // Functie voor verwijderen
+  const handleDeleteSLA = (idToDelete: string) => {
+    const updatedList = slaData.filter(sla => sla.id !== idToDelete);
+    setSlaData(updatedList);
   };
 
   return (
     <Shell>
       {currentView === 'home' && (
-        <Dashboard onNavigate={(viewId) => setCurrentView(viewId as View)} />
+        <Dashboard 
+          data={slaData} // <--- DIT WAS DE OORZAAK! Deze regel moet er staan.
+          onNavigate={(viewId) => setCurrentView(viewId as View)} 
+        />
       )}
       
       {currentView === 'list' && (
-        <SLAList data={slaData} onBack={() => setCurrentView('home')} />
+        <SLAList 
+          data={slaData} 
+          onBack={() => setCurrentView('home')} 
+          onDelete={handleDeleteSLA}
+        />
       )}
 
       {currentView === 'map' && (
-        <SLAMap 
-          data={slaData} 
-          onBack={() => setCurrentView('home')} 
-        />
+        <SLAMap data={slaData} onBack={() => setCurrentView('home')} />
       )}
       
       {currentView === 'add' && (

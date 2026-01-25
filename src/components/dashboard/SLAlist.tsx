@@ -1,14 +1,13 @@
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User } from 'lucide-react';
-// Zorg voor 'import type'
-import type { SLA } from '../../types/sla'; 
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2 } from 'lucide-react';
+import type { SLA } from '../../types/sla';
 
 interface SLAListProps {
-  data: SLA[]; // <--- De lijst moet weten dat hij data ontvangt
+  data: SLA[];
   onBack: () => void;
+  onDelete: (id: string) => void; // <--- NIEUW: De lijst moet weten dat hij mag verwijderen
 }
 
-// We halen 'data' hier binnen uit de props
-export const SLAList = ({ data, onBack }: SLAListProps) => {
+export const SLAList = ({ data, onBack, onDelete }: SLAListProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -19,17 +18,29 @@ export const SLAList = ({ data, onBack }: SLAListProps) => {
           <ArrowLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          {/* We laten even zien hoeveel items er zijn, handig voor debuggen */}
           <h2 className="text-2xl font-bold text-slate-900">Actieve Dossiers ({data.length})</h2>
           <p className="text-slate-500">Lijst van geplande interventies en materialen.</p>
         </div>
       </div>
 
       <div className="grid gap-4">
-        {/* BELANGRIJK: We mappen over 'data', NIET over 'mockSLAs' */}
         {data.map((sla) => (
-          <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all">
-            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
+          <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all group relative">
+            
+            {/* NIEUW: Verwijder knop (alleen zichtbaar bij hover, of altijd op mobiel) */}
+            <button 
+              onClick={() => {
+                if(window.confirm(`Weet je zeker dat je ${sla.clientName} wilt verwijderen?`)) {
+                  onDelete(sla.id);
+                }
+              }}
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+              title="Verwijder dossier"
+            >
+              <Trash2 size={20} />
+            </button>
+
+            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-12">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
                 <div className="flex items-center gap-2 text-slate-500 text-sm mt-1">
