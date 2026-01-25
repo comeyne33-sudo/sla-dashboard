@@ -12,30 +12,65 @@ type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>(mockSLAs);
-  
-  // 1. STATE: Hier houden we bij welk item bewerkt wordt
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
+  
+  // HIER IS DE MAGIE: Functie om elk adres ter wereld op te zoeken
+  const fetchCoordinates = async (address: string, city: string) => {
+    try {
+      // We vragen het aan OpenStreetMap (Nominatim)
+      const query = `${address}, ${city}, Belgium`;
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+      const data = await response.json();
 
-  // 2. LOGICA: Opslaan (Nieuw of Update)
-  const handleSaveSLA = (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
+      if (data && data.length > 0) {
+        // GEVONDEN! We geven de coördinaten terug
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        };
+      }
+    } catch (error) {
+      console.error("Kon locatie niet vinden:", error);
+    }
+
+    // FALLBACK: Als we het echt niet vinden, nemen we Brussel + een klein beetje random
+    // zodat pinnen niet exact op elkaar liggen.
+    return {
+      lat: 50.8503 + (Math.random() - 0.5) * 0.02,
+      lng: 4.3517 + (Math.random() - 0.5) * 0.02
+    };
+  };
+
+  // Deze functie is nu 'async' omdat we op internet moeten wachten
+  const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
+    
+    // Stap 1: Zoek de exacte coördinaten op basis van straat + stad
+    const coords = await fetchCoordinates(formData.location, formData.city);
+
     if (editingItem) {
-      // UPDATE: We vervangen het bestaande item
+      // UPDATE BESTAANDE
       const updatedList = slaData.map(item => {
         if (item.id === editingItem.id) {
-          return { ...item, ...formData, lastUpdate: 'Zojuist gewijzigd' };
+          return { 
+            ...item, 
+            ...formData, 
+            lat: coords.lat, // Gebruik de nieuwe coördinaten
+            lng: coords.lng,
+            lastUpdate: 'Zojuist gewijzigd' 
+          };
         }
         return item;
       });
       setSlaData(updatedList);
       setEditingItem(null); 
     } else {
-      // NIEUW: We maken een nieuwe aan
+      // MAAK NIEUWE
       const newSLA: SLA = {
         ...formData,
         id: (slaData.length + 1).toString(),
         status: 'active',
-        lat: 50.8503 + (Math.random() - 0.5) * 0.1,
-        lng: 4.3517 + (Math.random() - 0.5) * 0.1,
+        lat: coords.lat, // Gebruik de gevonden coördinaten
+        lng: coords.lng,
         lastUpdate: 'Zojuist'
       };
       setSlaData([...slaData, newSLA]);
@@ -47,7 +82,6 @@ function App() {
     setSlaData(slaData.filter(sla => sla.id !== idToDelete));
   };
 
-  // 3. LOGICA: Start bewerken
   const startEditing = (item: SLA) => {
     setEditingItem(item); 
     setCurrentView('add'); 
@@ -75,10 +109,7 @@ function App() {
           data={slaData} 
           onBack={() => setCurrentView('home')} 
           onDelete={handleDeleteSLA}
-          // ---------------------------------------------------------
-          // DIT IS DE REGEL DIE JE MISTE! Zonder dit crasht de knop.
           onEdit={startEditing} 
-          // ---------------------------------------------------------
         />
       )}
 
