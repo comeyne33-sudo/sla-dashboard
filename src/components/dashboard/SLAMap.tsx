@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react';
-import type { SLA } from '../../types/sla'; // <--- HIER ZAT DE FOUT
+import type { SLA } from '../../types/sla';
 
 const createCustomIcon = (status: string) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#10b981';
@@ -32,6 +32,9 @@ interface SLAMapProps {
 }
 
 export const SLAMap = ({ data, onBack }: SLAMapProps) => {
+  // VEILIGHEIDSCHECK: Voorkomt de "undefined" crash
+  const safeData = data || [];
+  
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   return (
@@ -65,7 +68,8 @@ export const SLAMap = ({ data, onBack }: SLAMapProps) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {data.map((sla) => (
+          {/* We gebruiken hier safeData in plaats van data */}
+          {safeData.map((sla) => (
             <Marker 
               key={sla.id} 
               position={[sla.lat, sla.lng]}
