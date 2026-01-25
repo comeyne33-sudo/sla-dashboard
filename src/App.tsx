@@ -12,32 +12,61 @@ type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>(mockSLAs);
+  
+  // 1. STATE: Hier houden we bij welk item bewerkt wordt
+  const [editingItem, setEditingItem] = useState<SLA | null>(null);
 
-  const handleAddSLA = (newData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
-    const newSLA: SLA = {
-      ...newData,
-      id: (slaData.length + 1).toString(),
-      status: 'active',
-      lat: 50.8503 + (Math.random() - 0.5) * 0.1,
-      lng: 4.3517 + (Math.random() - 0.5) * 0.1,
-      lastUpdate: 'Zojuist'
-    };
-    setSlaData([...slaData, newSLA]);
+  // 2. LOGICA: Opslaan (Nieuw of Update)
+  const handleSaveSLA = (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
+    if (editingItem) {
+      // UPDATE: We vervangen het bestaande item
+      const updatedList = slaData.map(item => {
+        if (item.id === editingItem.id) {
+          return { ...item, ...formData, lastUpdate: 'Zojuist gewijzigd' };
+        }
+        return item;
+      });
+      setSlaData(updatedList);
+      setEditingItem(null); 
+    } else {
+      // NIEUW: We maken een nieuwe aan
+      const newSLA: SLA = {
+        ...formData,
+        id: (slaData.length + 1).toString(),
+        status: 'active',
+        lat: 50.8503 + (Math.random() - 0.5) * 0.1,
+        lng: 4.3517 + (Math.random() - 0.5) * 0.1,
+        lastUpdate: 'Zojuist'
+      };
+      setSlaData([...slaData, newSLA]);
+    }
     setCurrentView('list');
   };
 
-  // Functie voor verwijderen
   const handleDeleteSLA = (idToDelete: string) => {
-    const updatedList = slaData.filter(sla => sla.id !== idToDelete);
-    setSlaData(updatedList);
+    setSlaData(slaData.filter(sla => sla.id !== idToDelete));
+  };
+
+  // 3. LOGICA: Start bewerken
+  const startEditing = (item: SLA) => {
+    setEditingItem(item); 
+    setCurrentView('add'); 
+  };
+
+  const startNew = () => {
+    setEditingItem(null); 
+    setCurrentView('add');
   };
 
   return (
     <Shell>
       {currentView === 'home' && (
         <Dashboard 
-          data={slaData} // <--- DIT WAS DE OORZAAK! Deze regel moet er staan.
-          onNavigate={(viewId) => setCurrentView(viewId as View)} 
+          data={slaData} 
+          onNavigate={(viewId) => {
+             if (viewId === 'add') startNew();
+             else setCurrentView(viewId as View);
+          }} 
         />
       )}
       
@@ -46,6 +75,10 @@ function App() {
           data={slaData} 
           onBack={() => setCurrentView('home')} 
           onDelete={handleDeleteSLA}
+          // ---------------------------------------------------------
+          // DIT IS DE REGEL DIE JE MISTE! Zonder dit crasht de knop.
+          onEdit={startEditing} 
+          // ---------------------------------------------------------
         />
       )}
 
@@ -55,8 +88,10 @@ function App() {
       
       {currentView === 'add' && (
         <SLAForm 
+          key={editingItem ? editingItem.id : 'new'} 
           onBack={() => setCurrentView('home')} 
-          onSubmit={handleAddSLA}
+          onSubmit={handleSaveSLA}
+          initialData={editingItem} 
         />
       )}
 

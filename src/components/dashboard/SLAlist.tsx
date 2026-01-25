@@ -1,13 +1,14 @@
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2 } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil } from 'lucide-react';
 import type { SLA } from '../../types/sla';
 
 interface SLAListProps {
   data: SLA[];
   onBack: () => void;
-  onDelete: (id: string) => void; // <--- NIEUW: De lijst moet weten dat hij mag verwijderen
+  onDelete: (id: string) => void;
+  onEdit: (sla: SLA) => void; // <--- Zonder dit werkt het niet
 }
 
-export const SLAList = ({ data, onBack, onDelete }: SLAListProps) => {
+export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -25,22 +26,35 @@ export const SLAList = ({ data, onBack, onDelete }: SLAListProps) => {
 
       <div className="grid gap-4">
         {data.map((sla) => (
-          <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all group relative">
+          <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             
-            {/* NIEUW: Verwijder knop (alleen zichtbaar bij hover, of altijd op mobiel) */}
-            <button 
-              onClick={() => {
-                if(window.confirm(`Weet je zeker dat je ${sla.clientName} wilt verwijderen?`)) {
-                  onDelete(sla.id);
-                }
-              }}
-              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-              title="Verwijder dossier"
-            >
-              <Trash2 size={20} />
-            </button>
+            {/* --- DE ACTIEKNOPPEN (HIER MOETEN ZE STAAN) --- */}
+            <div className="absolute top-6 right-6 flex gap-2">
+               {/* 1. Bewerk Knop (Blauw Potlood) */}
+               <button 
+                onClick={() => onEdit(sla)}
+                className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100"
+                title="Bewerken"
+              >
+                <Pencil size={18} />
+              </button>
 
-            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-12">
+              {/* 2. Verwijder Knop (Rode Vuilbak) */}
+              <button 
+                onClick={() => {
+                  if(window.confirm(`Weet je zeker dat je ${sla.clientName} wilt verwijderen?`)) {
+                    onDelete(sla.id);
+                  }
+                }}
+                className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100"
+                title="Verwijderen"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+            {/* --------------------------------------------- */}
+
+            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-24">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
                 <div className="flex items-center gap-2 text-slate-500 text-sm mt-1">
