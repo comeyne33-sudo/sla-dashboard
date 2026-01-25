@@ -1,4 +1,4 @@
-import { SLA } from '../types/sla';
+import type { SLA } from '../types/sla'; 
 
 export const mockSLAs: SLA[] = [
   {
