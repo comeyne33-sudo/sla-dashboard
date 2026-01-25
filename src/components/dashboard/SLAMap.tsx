@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react';
-import type { SLA } from '../../types/sla';
+import type { SLA } from '../../types/sla'; // Strict TypeScript fix
 
 const createCustomIcon = (status: string) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#10b981';
@@ -32,14 +32,14 @@ interface SLAMapProps {
 }
 
 export const SLAMap = ({ data, onBack }: SLAMapProps) => {
-  // VEILIGHEIDSCHECK: Voorkomt de "undefined" crash
+  // VEILIGHEID: Als data undefined is (door een foutje in App.tsx), gebruik dan een lege lijst []
+  // Dit voorkomt het witte scherm (crash).
   const safeData = data || [];
   
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
-      {/* Header */}
       <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <button 
           onClick={onBack}
@@ -56,7 +56,6 @@ export const SLAMap = ({ data, onBack }: SLAMapProps) => {
         </div>
       </div>
 
-      {/* De Kaart */}
       <div className="flex-1 rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0">
         <MapContainer 
           center={belgiumCenter} 
@@ -68,7 +67,6 @@ export const SLAMap = ({ data, onBack }: SLAMapProps) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* We gebruiken hier safeData in plaats van data */}
           {safeData.map((sla) => (
             <Marker 
               key={sla.id} 
@@ -98,9 +96,6 @@ export const SLAMap = ({ data, onBack }: SLAMapProps) => {
                     </div>
                     <div className="text-xs text-slate-600">
                       <strong>Nodig:</strong> {sla.partsNeeded}
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      <strong>Planning:</strong> {sla.plannedQuarter}
                     </div>
                   </div>
                 </div>
