@@ -2,9 +2,8 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { ArrowLeft, MapPin, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import type { SLA } from '../../types/sla'; // Strict import
+import type { SLA } from '../../types/sla';
 
-// De robuuste CSS markers
 const createCustomIcon = (status: string) => {
   const color = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f59e0b' : '#10b981';
   
@@ -35,9 +34,7 @@ interface SLAMapProps {
 }
 
 export const SLAMap = ({ data, onBack }: SLAMapProps) => {
-  // Console log om te checken of data binnenkomt
-  console.log("--> SLAMap ontvangt data:", data);
-
+  // We weten dat data binnenkomt (Array(3)), dus we gebruiken het veilig
   const safeData = data || [];
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
@@ -57,8 +54,13 @@ export const SLAMap = ({ data, onBack }: SLAMapProps) => {
         </div>
       </div>
 
-      {/* Kaart Container - AANGEPAST: min-h-150 in plaats van min-h-[600px] */}
-      <div className="flex-1 rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0 min-h-150">
+      {/* FIX: We gebruiken hier een inline style voor de hoogte.
+         Dit negeert Tailwind problemen en forceert de kaart om 600px hoog te zijn.
+      */}
+      <div 
+        className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0"
+        style={{ height: '600px', width: '100%' }} 
+      >
         <MapContainer 
           center={belgiumCenter} 
           zoom={9} 
