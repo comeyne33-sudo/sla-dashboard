@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 222 47% 20%;
-    --primary-foreground: 210 40% 98%;
-    --accent: 35 92% 50%;
-    --accent-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 20%;
-    --radius: 0.75rem;
-  }
+@theme {
+  /* We definiëren hier de kleuren direct voor v4 */
+  --color-border: hsl(214.3 32% 91%);
+  --color-background: hsl(210 20% 98%);
+  --color-foreground: hsl(222.2 47.4% 11.2%);
+  --color-primary: hsl(222.2 47.4% 11.2%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-accent: hsl(35 92% 50%);
+  
+  --radius-lg: 0.75rem;
 }
 
 @layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  * {
+    /* Verander 'border-border' naar een kleur die we hierboven hebben gedefinieerd */
+    border-color: var(--color-border);
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
 }
