@@ -1,11 +1,14 @@
 import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User } from 'lucide-react';
-import { mockSLAs } from '../../data/mockSLAs';
+// Zorg voor 'import type'
+import type { SLA } from '../../types/sla'; 
 
 interface SLAListProps {
+  data: SLA[]; // <--- De lijst moet weten dat hij data ontvangt
   onBack: () => void;
 }
 
-export const SLAList = ({ onBack }: SLAListProps) => {
+// We halen 'data' hier binnen uit de props
+export const SLAList = ({ data, onBack }: SLAListProps) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -16,15 +19,16 @@ export const SLAList = ({ onBack }: SLAListProps) => {
           <ArrowLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Actieve Dossiers</h2>
+          {/* We laten even zien hoeveel items er zijn, handig voor debuggen */}
+          <h2 className="text-2xl font-bold text-slate-900">Actieve Dossiers ({data.length})</h2>
           <p className="text-slate-500">Lijst van geplande interventies en materialen.</p>
         </div>
       </div>
 
       <div className="grid gap-4">
-        {mockSLAs.map((sla) => (
+        {/* BELANGRIJK: We mappen over 'data', NIET over 'mockSLAs' */}
+        {data.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all">
-            {/* Header */}
             <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
@@ -39,7 +43,6 @@ export const SLAList = ({ onBack }: SLAListProps) => {
               </span>
             </div>
 
-            {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
