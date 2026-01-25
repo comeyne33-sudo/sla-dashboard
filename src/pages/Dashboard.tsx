@@ -1,45 +1,90 @@
-import { LayoutList, MapPin, PlusCircle, Trash2 } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Map, Plus } from 'lucide-react';
+import type { SLA } from '../types/sla';
 
-// Deze interface is CRUCIAAL. Het vertelt VS Code: 
-// "Dit component verwacht een functie genaamd onNavigate"
 interface DashboardProps {
-  onNavigate: (page: string) => void;
+  data: SLA[]; 
+  onNavigate: (view: string) => void;
 }
 
-const tiles = [
-  { id: 'list', title: 'SLA Overzicht', desc: 'Lijstweergave van batterijen, uren en kwartalen.', icon: LayoutList, color: 'bg-blue-600', border: 'hover:border-blue-600' },
-  { id: 'map', title: 'Locatie Kaart', desc: 'Geografisch overzicht van alle klanten.', icon: MapPin, color: 'bg-emerald-600', border: 'hover:border-emerald-600' },
-  { id: 'add', title: 'Nieuwe SLA', desc: 'Voeg een nieuw contract toe.', icon: PlusCircle, color: 'bg-orange-500', border: 'hover:border-orange-500' },
-  { id: 'manage', title: 'Beheer', desc: 'Verwijder of pauzeer contracten.', icon: Trash2, color: 'bg-red-600', border: 'hover:border-red-600' },
-];
+export const Dashboard = ({ data, onNavigate }: DashboardProps) => {
+  const activeCount = data.filter(s => s.status === 'active').length;
+  const warningCount = data.filter(s => s.status === 'warning').length;
+  const criticalCount = data.filter(s => s.status === 'critical').length;
 
-export const Dashboard = ({ onNavigate }: DashboardProps) => {
   return (
     <div className="space-y-8">
-      <header className="pb-6 border-b border-slate-200">
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Overview</h1>
-        <p className="text-slate-500 mt-2">
-          Welkom terug. Er zijn momenteel <span className="font-bold text-blue-700">3 actieve SLA's</span> die aandacht vereisen.
-        </p>
+      <header>
+        <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+        <p className="text-slate-500">Welkom terug. Er zijn {data.length} dossiers in het systeem.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {tiles.map((tile) => {
-          const Icon = tile.icon;
-          return (
-            <button
-              key={tile.id}
-              onClick={() => onNavigate(tile.id)}
-              className={`group relative flex flex-col items-start p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all text-left ${tile.border}`}
-            >
-              <div className={`p-3 rounded-lg ${tile.color} text-white mb-4 shadow-md group-hover:scale-110 transition-transform`}>
-                <Icon size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">{tile.title}</h3>
-              <p className="text-sm text-slate-500 mt-1 leading-relaxed">{tile.desc}</p>
-            </button>
-          );
-        })}
+      {/* KPI Grid met ECHTE cijfers */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Rood - Kritiek */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-red-100 rounded-full text-red-600">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">{criticalCount}</div>
+            <div className="text-sm text-slate-500">Kritieke SLA's</div>
+          </div>
+        </div>
+
+        {/* Oranje - Waarschuwing */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-orange-100 rounded-full text-orange-600">
+            <Activity size={24} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">{warningCount}</div>
+            <div className="text-sm text-slate-500">Waarschuwingen</div>
+          </div>
+        </div>
+
+        {/* Groen - Op Schema */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-green-100 rounded-full text-green-600">
+            <CheckCircle size={24} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">{activeCount}</div>
+            <div className="text-sm text-slate-500">Op Schema</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Navigatie Knoppen */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <button 
+          onClick={() => onNavigate('list')}
+          className="p-6 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition-all flex flex-col items-center justify-center gap-3 group"
+        >
+          <div className="p-3 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
+            <Activity size={32} />
+          </div>
+          <span className="font-semibold text-lg">Bekijk Alle Dossiers</span>
+        </button>
+
+        <button 
+          onClick={() => onNavigate('map')}
+          className="p-6 bg-emerald-600 text-white rounded-xl shadow-md hover:bg-emerald-700 transition-all flex flex-col items-center justify-center gap-3 group"
+        >
+          <div className="p-3 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
+            <Map size={32} />
+          </div>
+          <span className="font-semibold text-lg">Locatie Kaart</span>
+        </button>
+
+        <button 
+          onClick={() => onNavigate('add')}
+          className="p-6 bg-orange-500 text-white rounded-xl shadow-md hover:bg-orange-600 transition-all flex flex-col items-center justify-center gap-3 group md:col-span-2"
+        >
+          <div className="p-3 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
+            <Plus size={32} />
+          </div>
+          <span className="font-semibold text-lg">Nieuwe SLA</span>
+        </button>
       </div>
     </div>
   );
