@@ -1,27 +1,26 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar } from 'lucide-react';
-// Let op: 'import type' omdat jouw instellingen streng zijn
 import type { SLA, SLAType, Quarter } from '../../types/sla';
 
 interface SLAFormProps {
   onBack: () => void;
-  onSubmit: (newSLA: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => void;
+  onSubmit: (data: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => void;
+  initialData?: SLA | null;
 }
 
-// Hier staat de 'export' die App.tsx zoekt
-export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
+export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
   const [formData, setFormData] = useState({
-    clientName: '',
-    location: '',
-    city: '',
-    type: 'Basic' as SLAType,
-    partsNeeded: '',
-    hoursRequired: 2,
-    plannedQuarter: 'Q1' as Quarter,
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    price: 0
+    clientName: initialData?.clientName || '',
+    location: initialData?.location || '',
+    city: initialData?.city || '',
+    type: (initialData?.type || 'Basic') as SLAType,
+    partsNeeded: initialData?.partsNeeded || '',
+    hoursRequired: initialData?.hoursRequired || 2,
+    plannedQuarter: (initialData?.plannedQuarter || 'Q1') as Quarter,
+    contactName: initialData?.contactName || '',
+    contactPhone: initialData?.contactPhone || '',
+    contactEmail: initialData?.contactEmail || '',
+    price: initialData?.price || 0
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -31,21 +30,23 @@ export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
 
   return (
     <div className="max-w-3xl mx-auto h-full overflow-y-auto pb-10">
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6 sticky top-0 bg-slate-50 py-4 z-10">
         <button onClick={onBack} className="p-2 hover:bg-white rounded-full transition-colors border border-transparent hover:border-slate-200 shadow-sm">
           <ArrowLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Nieuw Contract</h2>
-          <p className="text-slate-500">Voeg een nieuwe klant toe aan de database.</p>
+          <h2 className="text-2xl font-bold text-slate-900">
+            {initialData ? 'Dossier Bewerken' : 'Nieuw Contract'}
+          </h2>
+          <p className="text-slate-500">
+            {initialData ? 'Pas de gegevens van deze klant aan.' : 'Voeg een nieuwe klant toe aan de database.'}
+          </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 space-y-8">
-          
-          {/* Sectie 1: Algemeen */}
+          {/* Sectie 1: Bedrijf */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Building size={18} className="text-blue-600" /> Bedrijfsgegevens
@@ -54,22 +55,22 @@ export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Klantnaam</label>
                 <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-                  value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} placeholder="bv. Havenbedrijf Gent" />
+                  value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Contactpersoon</label>
                 <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-                  value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} placeholder="bv. Jan Peeters" />
+                  value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Telefoon</label>
                 <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-                  value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} placeholder="+32 ..." />
+                  value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                 <input required type="email" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-                  value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} placeholder="@bedrijf.be" />
+                  value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} />
               </div>
             </div>
           </div>
@@ -83,17 +84,17 @@ export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Stad</label>
                 <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-                  value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} placeholder="bv. Antwerpen" />
+                  value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Specifieke Locatie</label>
                 <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
-                  value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="bv. Hal 3, Poort 4" />
+                  value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
               </div>
             </div>
           </div>
 
-          {/* Sectie 3: Contract Details */}
+          {/* Sectie 3: Contract */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Wrench size={18} className="text-orange-500" /> Service Level
@@ -111,7 +112,7 @@ export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Benodigde Onderdelen</label>
                 <input type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                  value={formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} placeholder="bv. Batterij 12V" />
+                  value={formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>
@@ -142,14 +143,13 @@ export const SLAForm = ({ onBack, onSubmit }: SLAFormProps) => {
 
         </div>
 
-        {/* Footer Buttons */}
         <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-200 sticky bottom-0">
           <button type="button" onClick={onBack} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors">
             Annuleren
           </button>
           <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2 transition-transform active:scale-95">
             <Save size={18} />
-            Opslaan
+            {initialData ? 'Wijzigingen Opslaan' : 'Aanmaken'}
           </button>
         </div>
       </form>
