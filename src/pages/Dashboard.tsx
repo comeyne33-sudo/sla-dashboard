@@ -1,22 +1,26 @@
-import { LayoutList, MapPin, PlusCircle, Trash2, ClipboardCheck } from 'lucide-react';
+import { LayoutList, MapPin, PlusCircle, Trash2 } from 'lucide-react';
+
+// Deze interface is CRUCIAAL. Het vertelt VS Code: 
+// "Dit component verwacht een functie genaamd onNavigate"
+interface DashboardProps {
+  onNavigate: (page: string) => void;
+}
 
 const tiles = [
-  { id: 'list', title: 'SLA Overzicht', desc: 'Batterijen & planning', icon: LayoutList, color: 'bg-blue-600' },
-  { id: 'map', title: 'Kaart', desc: 'Locaties in België', icon: MapPin, color: 'bg-emerald-600' },
-  { id: 'add', title: 'Nieuwe SLA', desc: 'Toevoegen aan systeem', icon: PlusCircle, color: 'bg-orange-500' },
-  { id: 'manage', title: 'Beheer', desc: 'Aanpassen of wissen', icon: Trash2, color: 'bg-red-600' },
+  { id: 'list', title: 'SLA Overzicht', desc: 'Lijstweergave van batterijen, uren en kwartalen.', icon: LayoutList, color: 'bg-blue-600', border: 'hover:border-blue-600' },
+  { id: 'map', title: 'Locatie Kaart', desc: 'Geografisch overzicht van alle klanten.', icon: MapPin, color: 'bg-emerald-600', border: 'hover:border-emerald-600' },
+  { id: 'add', title: 'Nieuwe SLA', desc: 'Voeg een nieuw contract toe.', icon: PlusCircle, color: 'bg-orange-500', border: 'hover:border-orange-500' },
+  { id: 'manage', title: 'Beheer', desc: 'Verwijder of pauzeer contracten.', icon: Trash2, color: 'bg-red-600', border: 'hover:border-red-600' },
 ];
 
-export const Dashboard = () => {
+export const Dashboard = ({ onNavigate }: DashboardProps) => {
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-blue-800 font-bold italic">
-          <ClipboardCheck size={28} />
-          <span className="text-2xl tracking-tighter uppercase">Santens Automatics</span>
-        </div>
-        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
-        <p className="text-slate-500">Beheer je onderhoudscontracten en batterijwissels.</p>
+      <header className="pb-6 border-b border-slate-200">
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Overview</h1>
+        <p className="text-slate-500 mt-2">
+          Welkom terug. Er zijn momenteel <span className="font-bold text-blue-700">3 actieve SLA's</span> die aandacht vereisen.
+        </p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -25,13 +29,14 @@ export const Dashboard = () => {
           return (
             <button
               key={tile.id}
-              className="group relative flex flex-col items-start p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all text-left"
+              onClick={() => onNavigate(tile.id)}
+              className={`group relative flex flex-col items-start p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all text-left ${tile.border}`}
             >
-              <div className={`p-3 rounded-xl ${tile.color} text-white mb-4 group-hover:scale-110 transition-transform`}>
+              <div className={`p-3 rounded-lg ${tile.color} text-white mb-4 shadow-md group-hover:scale-110 transition-transform`}>
                 <Icon size={24} />
               </div>
               <h3 className="text-lg font-bold text-slate-900">{tile.title}</h3>
-              <p className="text-sm text-slate-500 mt-1">{tile.desc}</p>
+              <p className="text-sm text-slate-500 mt-1 leading-relaxed">{tile.desc}</p>
             </button>
           );
         })}
