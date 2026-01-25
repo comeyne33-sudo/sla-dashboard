@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Shell } from './components/layout/Shell';
 import { Dashboard } from './pages/Dashboard';
 import { SLAList } from './components/dashboard/SLAList';
-
 // Dit type definieert welke schermen we hebben
 type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 
