@@ -247,6 +247,7 @@ function App() {
         <Settings 
           onBack={() => setCurrentView('home')} 
           onResetYear={handleYearReset} 
+          data={slaData}
         />
       )}
     </Shell>
