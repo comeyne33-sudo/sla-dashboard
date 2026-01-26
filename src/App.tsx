@@ -6,7 +6,7 @@ import { Login } from './pages/Login';
 import { SLAList } from './components/dashboard/OverviewList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
-import { Toast, ToastType } from './components/ui/Toast'; // <--- NIEUWE IMPORT
+import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
 import type { SLA } from './types/sla';
 
@@ -19,7 +19,6 @@ function App() {
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // NIEUWE STATE VOOR TOAST
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
 
   useEffect(() => {
@@ -87,7 +86,6 @@ function App() {
 
       if (error) throw error;
 
-      // SUCCES MELDING
       showToast(editingItem ? 'Dossier succesvol bijgewerkt!' : 'Nieuw contract aangemaakt!', 'success');
       
       await fetchSLAs();
@@ -96,7 +94,6 @@ function App() {
     
     } catch (error) {
       console.error(error);
-      // FOUT MELDING
       showToast('Er ging iets mis bij het opslaan.', 'error');
     }
   };
@@ -123,7 +120,7 @@ function App() {
   const startNew = () => { setEditingItem(null); setCurrentView('add'); };
 
   const handleViewSLA = (id: string) => {
-    // Hier zouden we logic kunnen toevoegen om te filteren op ID, voor nu gaan we naar lijst
+    console.log("Navigeren naar:", id);
     setCurrentView('list');
   };
 
@@ -132,21 +129,30 @@ function App() {
 
   return (
     <Shell onLogout={handleLogout}>
-      {/* TOAST WEERGEVEN INDIEN AANWEZIG */}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       {currentView === 'home' && (
         <Dashboard data={slaData} onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} />
       )}
+      
       {currentView === 'list' && (
-        <SLAList data={slaData} onBack={() => setCurrentView('home')} onDelete={handleDeleteSLA} onEdit={startEditing} />
+        <SLAList 
+          data={slaData} 
+          onBack={() => setCurrentView('home')} 
+          onDelete={handleDeleteSLA} 
+          onEdit={startEditing}
+          onRefresh={fetchSLAs} // <--- HIER GEVEN WE DE REFRESH FUNCTIE MEE
+        />
       )}
+      
       {currentView === 'map' && (
         <SLAMap data={slaData} onBack={() => setCurrentView('home')} onViewSLA={handleViewSLA} />
       )}
+      
       {currentView === 'add' && (
         <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} />
       )}
+      
       {currentView === 'manage' && (
         <div className="p-8 text-center bg-white rounded-xl border">
           Beheer functionaliteit volgt. 
