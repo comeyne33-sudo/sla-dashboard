@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'; // <--- HIER HEB IK 'type'
 import { Shell } from './components/layout/Shell';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
-import { SLAList } from './components/dashboard/SLAList';
+import { SLAList } from './components/dashboard/DashboardList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
 import { supabase } from './lib/supabase';
