@@ -8,8 +8,6 @@ interface SLAListProps {
   onEdit: (sla: SLA) => void;
 }
 
-// Hulplijstje om het getal (1-12) om te zetten naar tekst
-// Index 0 laten we leeg, zodat maand 1 ook echt op index 1 (Januari) valt.
 const monthNames = [
   "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
   "Juli", "Augustus", "September", "Oktober", "November", "December"
