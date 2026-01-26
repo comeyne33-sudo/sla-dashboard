@@ -14,6 +14,7 @@ export interface SLA {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  comments: string; // <--- NIEUW VELD
   price: number;
   lat: number;
   lng: number;

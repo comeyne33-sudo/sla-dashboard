@@ -3,9 +3,10 @@ import type { Session } from '@supabase/supabase-js';
 import { Shell } from './components/layout/Shell';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
-import { SLAList } from './components/dashboard/OverviewList'; // <--- Let op deze naam!
+import { SLAList } from './components/dashboard/OverviewList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
+import { Toast, ToastType } from './components/ui/Toast'; // <--- NIEUWE IMPORT
 import { supabase } from './lib/supabase';
 import type { SLA } from './types/sla';
 
@@ -18,7 +19,9 @@ function App() {
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. AUTHENTICATIE CHECK
+  // NIEUWE STATE VOOR TOAST
+  const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -32,12 +35,13 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 2. DATA OPHALEN
   useEffect(() => {
-    if (session) {
-      fetchSLAs();
-    }
+    if (session) fetchSLAs();
   }, [session]);
+
+  const showToast = (msg: string, type: ToastType) => {
+    setToast({ msg, type });
+  };
 
   const fetchSLAs = async () => {
     const { data, error } = await supabase
@@ -60,30 +64,53 @@ function App() {
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-    const coords = await fetchCoordinates(formData.location, formData.city);
-    const mapStatus = formData.isExecuted ? 'active' : 'warning';
-    
-    const dataToSave = {
-      ...formData,
-      lat: coords.lat,
-      lng: coords.lng,
-      status: mapStatus,
-      lastUpdate: new Date().toLocaleDateString('nl-BE')
-    };
+    try {
+      const coords = await fetchCoordinates(formData.location, formData.city);
+      const mapStatus = formData.isExecuted ? 'active' : 'warning';
+      
+      const dataToSave = {
+        ...formData,
+        lat: coords.lat,
+        lng: coords.lng,
+        status: mapStatus,
+        lastUpdate: new Date().toLocaleDateString('nl-BE')
+      };
 
-    if (editingItem) {
-      await supabase.from('slas').update(dataToSave).eq('id', editingItem.id);
-    } else {
-      await supabase.from('slas').insert([dataToSave]);
+      let error;
+      if (editingItem) {
+        const { error: updateError } = await supabase.from('slas').update(dataToSave).eq('id', editingItem.id);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase.from('slas').insert([dataToSave]);
+        error = insertError;
+      }
+
+      if (error) throw error;
+
+      // SUCCES MELDING
+      showToast(editingItem ? 'Dossier succesvol bijgewerkt!' : 'Nieuw contract aangemaakt!', 'success');
+      
+      await fetchSLAs();
+      setEditingItem(null);
+      setCurrentView('list');
+    
+    } catch (error) {
+      console.error(error);
+      // FOUT MELDING
+      showToast('Er ging iets mis bij het opslaan.', 'error');
     }
-    await fetchSLAs();
-    setEditingItem(null);
-    setCurrentView('list');
   };
 
   const handleDeleteSLA = async (idToDelete: string) => {
-    await supabase.from('slas').delete().eq('id', idToDelete);
-    fetchSLAs();
+    try {
+      const { error } = await supabase.from('slas').delete().eq('id', idToDelete);
+      if (error) throw error;
+      
+      showToast('Dossier verwijderd.', 'success');
+      fetchSLAs();
+    } catch (error) {
+      showToast('Kon dossier niet verwijderen.', 'error');
+    }
   };
 
   const handleLogout = async () => {
@@ -96,58 +123,30 @@ function App() {
   const startNew = () => { setEditingItem(null); setCurrentView('add'); };
 
   const handleViewSLA = (id: string) => {
-    console.log("Navigeren naar:", id);
+    // Hier zouden we logic kunnen toevoegen om te filteren op ID, voor nu gaan we naar lijst
     setCurrentView('list');
   };
 
-  // --- RENDERING ---
-
-  if (loading && !session) {
-    return <div className="min-h-screen flex items-center justify-center text-blue-600">Laden...</div>;
-  }
-
-  if (!session) {
-    return <Login />;
-  }
+  if (loading && !session) return <div className="min-h-screen flex items-center justify-center text-blue-600">Laden...</div>;
+  if (!session) return <Login />;
 
   return (
     <Shell onLogout={handleLogout}>
+      {/* TOAST WEERGEVEN INDIEN AANWEZIG */}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
       {currentView === 'home' && (
-        <Dashboard 
-          data={slaData} 
-          onNavigate={(viewId) => { 
-            if (viewId === 'add') startNew(); 
-            else setCurrentView(viewId as View); 
-          }} 
-        />
+        <Dashboard data={slaData} onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} />
       )}
-
       {currentView === 'list' && (
-        <SLAList 
-          data={slaData} 
-          onBack={() => setCurrentView('home')} 
-          onDelete={handleDeleteSLA} 
-          onEdit={startEditing} 
-        />
+        <SLAList data={slaData} onBack={() => setCurrentView('home')} onDelete={handleDeleteSLA} onEdit={startEditing} />
       )}
-
       {currentView === 'map' && (
-        <SLAMap 
-          data={slaData} 
-          onBack={() => setCurrentView('home')} 
-          onViewSLA={handleViewSLA}
-        />
+        <SLAMap data={slaData} onBack={() => setCurrentView('home')} onViewSLA={handleViewSLA} />
       )}
-
       {currentView === 'add' && (
-        <SLAForm 
-          key={editingItem ? editingItem.id : 'new'} 
-          onBack={() => setCurrentView('home')} 
-          onSubmit={handleSaveSLA} 
-          initialData={editingItem} 
-        />
+        <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} />
       )}
-
       {currentView === 'manage' && (
         <div className="p-8 text-center bg-white rounded-xl border">
           Beheer functionaliteit volgt. 

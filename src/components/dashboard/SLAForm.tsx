@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare } from 'lucide-react';
+import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare } from 'lucide-react';
 import type { SLA, SLAType } from '../../types/sla';
 
 interface SLAFormProps {
@@ -15,11 +15,12 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     city: initialData?.city || '',
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
-    hoursRequired: initialData?.hoursRequired || 2, // Default 2 uur
+    hoursRequired: initialData?.hoursRequired || 2,
     plannedMonth: initialData?.plannedMonth || 1, 
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
     contactEmail: initialData?.contactEmail || '',
+    comments: initialData?.comments || '', // <--- NIEUWE STATE
     price: initialData?.price || 0,
     isExecuted: initialData?.isExecuted || false,
   });
@@ -122,7 +123,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Wrench size={18} className="text-orange-500" /> Service Level
             </h3>
-            {/* HIER ZIJN DE VELDEN VOOR PRIJS EN UREN TOEGEVOEGD */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type Contract</label>
@@ -148,12 +148,11 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
                 />
               </div>
 
-              {/* HIER IS HET NIEUWE VELD VOOR UREN */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Geschatte Uren Werk</label>
                 <input 
                   type="number" 
-                  step="0.5" // Stapjes van een half uur
+                  step="0.5" 
                   className="w-full p-2 border border-slate-300 rounded-lg" 
                   value={formData.hoursRequired} 
                   onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} 
@@ -187,6 +186,23 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
               </div>
             </div>
           </div>
+
+          {/* --- NIEUW: COMMENTAAR VELD --- */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
+              <MessageSquare size={18} className="text-slate-500" /> Commentaar & Extra Info
+            </h3>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Opmerkingen (Gebouw info, extra contacten...)</label>
+              <textarea 
+                className="w-full p-3 border border-slate-300 rounded-lg min-h-[120px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Bijv: Sleutel bij de buren, extra contactpersoon Jan (0475/...), gebouwcode 1234."
+                value={formData.comments}
+                onChange={e => setFormData({...formData, comments: e.target.value})}
+              />
+            </div>
+          </div>
+
         </div>
 
         <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-200 sticky bottom-0">

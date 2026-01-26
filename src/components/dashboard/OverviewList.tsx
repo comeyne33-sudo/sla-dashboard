@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search } from 'lucide-react';
 import type { SLA, SLAType } from '../../types/sla';
 
 interface SLAListProps {
@@ -32,14 +32,31 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'todo' | 'done'>('all');
   const [filterType, setFilterType] = useState<'all' | SLAType>('all');
   const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
+  
+  // NIEUWE STATE VOOR ZOEKEN
+  const [searchQuery, setSearchQuery] = useState('');
 
   const processedData = useMemo(() => {
     let result = [...data];
 
+    // 1. ZOEKEN (Filteren op tekst)
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter(s => 
+        s.clientName.toLowerCase().includes(lowerQuery) ||
+        s.city.toLowerCase().includes(lowerQuery) ||
+        s.location.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    // 2. Filteren op Status
     if (filterStatus === 'todo') result = result.filter(s => !s.isExecuted);
     if (filterStatus === 'done') result = result.filter(s => s.isExecuted);
+
+    // 3. Filteren op Type
     if (filterType !== 'all') result = result.filter(s => s.type === filterType);
 
+    // 4. Sorteren
     result.sort((a, b) => {
       if (sortBy === 'name') return a.clientName.localeCompare(b.clientName);
       if (sortBy === 'month') return a.plannedMonth - b.plannedMonth;
@@ -52,7 +69,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
     });
 
     return result;
-  }, [data, filterStatus, filterType, sortBy]);
+  }, [data, filterStatus, filterType, sortBy, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -66,61 +83,80 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
         
-        <div>
-          {/* FIX: 'block' verwijderd, 'flex' behouden */}
-          <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
-            <Filter size={12} /> Status
-          </label>
-          <select 
-            className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-          >
-            <option value="all">Alles Tonen</option>
-            <option value="todo">Nog te doen</option>
-            <option value="done">Reeds uitgevoerd</option>
-          </select>
+        {/* --- DE NIEUWE ZOEKBALK --- */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={18} className="text-slate-400" />
+          </div>
+          <input 
+            type="text" 
+            placeholder="Zoek op klantnaam, stad of straat..." 
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
-        <div>
-          {/* FIX: 'block' verwijderd */}
-          <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
-            <Filter size={12} /> Type Contract
-          </label>
-          <select 
-            className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-          >
-            <option value="all">Alle Types</option>
-            <option value="Basic">Basic</option>
-            <option value="Comfort">Comfort</option>
-            <option value="Premium">Premium</option>
-          </select>
-        </div>
+        {/* --- DE FILTERS (GRID) --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
+              <Filter size={12} /> Status
+            </label>
+            <select 
+              className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+            >
+              <option value="all">Alles Tonen</option>
+              <option value="todo">Nog te doen</option>
+              <option value="done">Reeds uitgevoerd</option>
+            </select>
+          </div>
 
-        <div>
-          {/* FIX: 'block' verwijderd */}
-          <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
-            <SortAsc size={12} /> Sorteren Op
-          </label>
-          <select 
-            className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-          >
-            <option value="month">Uitvoeringsmaand</option>
-            <option value="name">Klantnaam (A-Z)</option>
-            <option value="distance">Afstand (vanaf Merelbeke)</option>
-          </select>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
+              <Filter size={12} /> Type Contract
+            </label>
+            <select 
+              className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as any)}
+            >
+              <option value="all">Alle Types</option>
+              <option value="Basic">Basic</option>
+              <option value="Comfort">Comfort</option>
+              <option value="Premium">Premium</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
+              <SortAsc size={12} /> Sorteren Op
+            </label>
+            <select 
+              className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+            >
+              <option value="month">Uitvoeringsmaand</option>
+              <option value="name">Klantnaam (A-Z)</option>
+              <option value="distance">Afstand (vanaf Merelbeke)</option>
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4">
         {processedData.length === 0 && (
-          <div className="text-center py-10 text-slate-500">Geen resultaten gevonden voor deze filters.</div>
+          <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
+            <p className="text-slate-500 font-medium">Geen dossiers gevonden die voldoen aan je zoekopdracht.</p>
+            <button onClick={() => {setSearchQuery(''); setFilterStatus('all'); setFilterType('all');}} className="mt-2 text-blue-600 text-sm hover:underline">
+              Filters wissen
+            </button>
+          </div>
         )}
 
         {processedData.map((sla) => (
@@ -173,7 +209,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                     <Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen specifiek materiaal'}
                   </div>
                 )}
-                {/* DIT WAS ER AL, MAAR NU KAN JE HET OOK BEWERKEN VIA HET FORMULIER */}
                 <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div>
               </div>
 
