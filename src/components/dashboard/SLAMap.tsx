@@ -1,18 +1,17 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react'; // Nieuwe imports
+import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import type { SLA } from '../../types/sla';
 
-// Dezelfde lijst met maanden als in de andere componenten
 const monthNames = [
   "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
   "Juli", "Augustus", "September", "Oktober", "November", "December"
 ];
 
-// HULPFUNCTIE: Bepaal de statuskleur op basis van de datumlogica (net als op het dashboard)
+// Status logic (hetzelfde als dashboard)
 const getMarkerStatus = (sla: SLA) => {
-  if (sla.isExecuted) return 'executed'; // Groen
+  if (sla.isExecuted) return 'executed'; 
 
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
@@ -22,13 +21,12 @@ const getMarkerStatus = (sla: SLA) => {
   if (nextMonth > 12) nextMonth -= 12;
   if (monthAfter > 12) monthAfter -= 12;
 
-  if (sla.plannedMonth <= currentMonth) return 'critical'; // Rood (Te laat of nu)
-  if (sla.plannedMonth === nextMonth || sla.plannedMonth === monthAfter) return 'upcoming'; // Oranje (Binnenkort)
+  if (sla.plannedMonth <= currentMonth) return 'critical'; 
+  if (sla.plannedMonth === nextMonth || sla.plannedMonth === monthAfter) return 'upcoming'; 
   
-  return 'future'; // (Optioneel: voor verder in de toekomst, voor nu niet gebruikt in kleuren)
+  return 'future';
 };
 
-// HULPFUNCTIE: Maak het icoontje op basis van de status
 const createCustomIcon = (status: string) => {
   let color = '#94a3b8'; // Standaard grijs
   if (status === 'executed') color = '#10b981'; // Groen
@@ -44,7 +42,7 @@ const createCustomIcon = (status: string) => {
       border-radius: 50%;
       border: 3px solid white;
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    "></div>`, // Simpel gekleurd bolletje zonder wit puntje binnenin
+    "></div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
     popupAnchor: [0, -12]
@@ -54,12 +52,12 @@ const createCustomIcon = (status: string) => {
 interface SLAMapProps {
   data: SLA[];
   onBack: () => void;
-  onViewSLA: (id: string) => void; // NIEUWE PROP voor de navigatieknop
+  onViewSLA: (id: string) => void; 
 }
 
 export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   const safeData = data || [];
-  // Een iets centraler punt in België om mee te beginnen
+  // Centrum van België
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   return (
@@ -78,10 +76,13 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
         </div>
       </div>
 
-      {/* Kaart Container */}
+      {/* HIER ZAT HET PROBLEEM.
+          We gebruiken nu een vaste pixel hoogte (600px).
+          Dit garandeert dat de kaart zichtbaar is.
+      */}
       <div 
-        className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0 flex-1" // flex-1 zorgt dat hij de rest van de hoogte neemt
-        style={{ minHeight: '500px' }} 
+        className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0"
+        style={{ height: '600px', width: '100%' }} 
       >
         <MapContainer 
           center={belgiumCenter} 
