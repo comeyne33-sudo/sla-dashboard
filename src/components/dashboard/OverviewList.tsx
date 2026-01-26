@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 import type { SLA, SLAType } from '../../types/sla';
 
 interface SLAListProps {
@@ -32,14 +32,11 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'todo' | 'done'>('all');
   const [filterType, setFilterType] = useState<'all' | SLAType>('all');
   const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
-  
-  // NIEUWE STATE VOOR ZOEKEN
   const [searchQuery, setSearchQuery] = useState('');
 
   const processedData = useMemo(() => {
     let result = [...data];
 
-    // 1. ZOEKEN (Filteren op tekst)
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(s => 
@@ -49,14 +46,10 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
       );
     }
 
-    // 2. Filteren op Status
     if (filterStatus === 'todo') result = result.filter(s => !s.isExecuted);
     if (filterStatus === 'done') result = result.filter(s => s.isExecuted);
-
-    // 3. Filteren op Type
     if (filterType !== 'all') result = result.filter(s => s.type === filterType);
 
-    // 4. Sorteren
     result.sort((a, b) => {
       if (sortBy === 'name') return a.clientName.localeCompare(b.clientName);
       if (sortBy === 'month') return a.plannedMonth - b.plannedMonth;
@@ -84,8 +77,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
       </div>
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        
-        {/* --- DE NIEUWE ZOEKBALK --- */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={18} className="text-slate-400" />
@@ -99,7 +90,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
           />
         </div>
 
-        {/* --- DE FILTERS (GRID) --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
           <div>
             <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
@@ -161,6 +151,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
 
         {processedData.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
+            
             <div className="absolute top-6 right-6 flex gap-2">
                <button onClick={() => onEdit(sla)} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100">
                 <Pencil size={18} />
@@ -227,6 +218,41 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                 <div className="flex items-center gap-2 text-slate-700 truncate"><Mail size={16} className="text-slate-400"/> {sla.contactEmail}</div>
               </div>
             </div>
+
+            {/* --- HIER IS HET: COMMENTAAR & BIJLAGEN SECTIE --- */}
+            {/* We tonen dit blok alleen als er commentaar OF bijlagen zijn */}
+            {(sla.comments || (sla.attachments && sla.attachments.length > 0)) && (
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* 1. Commentaar (indien aanwezig) */}
+                {sla.comments && (
+                  <div className="text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start">
+                    <MessageSquare size={16} className="shrink-0 mt-0.5 text-slate-400" />
+                    <span>"{sla.comments}"</span>
+                  </div>
+                )}
+
+                {/* 2. Bijlagen (indien aanwezig) */}
+                {sla.attachments && sla.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 items-start">
+                    {sla.attachments.map((file, idx) => (
+                      <a 
+                        key={idx} 
+                        href={file.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors border border-blue-100"
+                        title={file.name}
+                      >
+                        {file.type === 'image' ? <ImageIcon size={14} /> : <FileText size={14} />}
+                        <span className="truncate max-w-[150px]">{file.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
           </div>
         ))}
       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare } from 'lucide-react';
-import type { SLA, SLAType } from '../../types/sla';
+import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import type { SLA, SLAType, Attachment } from '../../types/sla';
+import { supabase } from '../../lib/supabase';
 
 interface SLAFormProps {
   onBack: () => void;
@@ -20,14 +21,66 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
     contactEmail: initialData?.contactEmail || '',
-    comments: initialData?.comments || '', // <--- NIEUWE STATE
+    comments: initialData?.comments || '',
+    attachments: initialData?.attachments || [] as Attachment[], // <--- BIJLAGEN
     price: initialData?.price || 0,
     isExecuted: initialData?.isExecuted || false,
   });
 
+  const [uploading, setUploading] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
+  };
+
+  // Functie om bestanden te uploaden naar Supabase Storage
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    setUploading(true);
+    const files = Array.from(e.target.files);
+    const newAttachments: Attachment[] = [];
+
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('sla-files')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('sla-files')
+          .getPublicUrl(filePath);
+
+        newAttachments.push({
+          name: file.name,
+          url: publicUrl,
+          type: file.type.startsWith('image/') ? 'image' : 'file'
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Fout bij uploaden van ' + file.name);
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      attachments: [...prev.attachments, ...newAttachments]
+    }));
+    setUploading(false);
+  };
+
+  const removeAttachment = (indexToRemove: number) => {
+    setFormData(prev => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, index) => index !== indexToRemove)
+    }));
   };
 
   const months = [
@@ -68,7 +121,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
                   />
                   Interventie is reeds uitgevoerd
                 </label>
-                <p className="text-sm text-slate-500 ml-7">Vink dit aan als het werk voltooid is.</p>
               </div>
             </div>
           )}
@@ -187,19 +239,66 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             </div>
           </div>
 
-          {/* --- NIEUW: COMMENTAAR VELD --- */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <MessageSquare size={18} className="text-slate-500" /> Commentaar & Extra Info
             </h3>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Opmerkingen (Gebouw info, extra contacten...)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Opmerkingen</label>
               <textarea 
-                className="w-full p-3 border border-slate-300 rounded-lg min-h-[120px] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Bijv: Sleutel bij de buren, extra contactpersoon Jan (0475/...), gebouwcode 1234."
+                className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]"
                 value={formData.comments}
                 onChange={e => setFormData({...formData, comments: e.target.value})}
               />
+            </div>
+          </div>
+
+          {/* --- NIEUW: BIJLAGEN SECTIE --- */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
+              <Paperclip size={18} className="text-slate-500" /> Bijlagen (Contract, Foto's)
+            </h3>
+            
+            <div className="space-y-3">
+              {/* Upload Knop */}
+              <div className="flex items-center gap-3">
+                <label className={`
+                  flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg cursor-pointer hover:bg-slate-200 transition-colors border border-slate-200
+                  ${uploading ? 'opacity-50 pointer-events-none' : ''}
+                `}>
+                  {uploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
+                  <span className="font-medium">{uploading ? 'Uploaden...' : 'Bestand toevoegen'}</span>
+                  <input type="file" multiple className="hidden" onChange={handleFileUpload} />
+                </label>
+                <span className="text-xs text-slate-400">PDF, JPG, PNG toegestaan</span>
+              </div>
+
+              {/* Lijst van bijlagen */}
+              {formData.attachments.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                  {formData.attachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg group">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        {file.type === 'image' ? (
+                          <ImageIcon size={16} className="text-purple-500 shrink-0" />
+                        ) : (
+                          <FileText size={16} className="text-blue-500 shrink-0" />
+                        )}
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 truncate hover:underline hover:text-blue-600">
+                          {file.name}
+                        </a>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => removeAttachment(idx)}
+                        className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -209,7 +308,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
           <button type="button" onClick={onBack} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors">
             Annuleren
           </button>
-          <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2">
+          <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2 disabled:opacity-50">
             <Save size={18} />
             {initialData ? 'Wijzigingen Opslaan' : 'Aanmaken'}
           </button>

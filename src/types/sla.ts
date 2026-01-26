@@ -1,6 +1,12 @@
 export type SLAType = 'Basic' | 'Comfort' | 'Premium';
 export type SLAStatus = 'active' | 'warning' | 'critical'; 
 
+export interface Attachment {
+  name: string;
+  url: string;
+  type: 'image' | 'file';
+}
+
 export interface SLA {
   id: string;
   clientName: string;
@@ -14,7 +20,8 @@ export interface SLA {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
-  comments: string; // <--- NIEUW VELD
+  comments: string;
+  attachments: Attachment[]; // <--- NIEUW: Lijst met bijlagen
   price: number;
   lat: number;
   lng: number;
