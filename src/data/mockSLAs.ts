@@ -1,4 +1,4 @@
-import type { SLA } from '../types/sla'; // Strict TypeScript fix
+import type { SLA } from '../types/sla'; // Strict import fix
 
 export const mockSLAs: SLA[] = [
   {
@@ -15,7 +15,7 @@ export const mockSLAs: SLA[] = [
     contactPhone: '+32 478 12 34 56',
     contactEmail: 'jan@portofantwerp.be',
     plannedQuarter: 'Q1',
-    lat: 51.2194, // Antwerpen
+    lat: 51.2194,
     lng: 4.4025,
     lastUpdate: '2 min geleden'
   },
@@ -33,7 +33,7 @@ export const mockSLAs: SLA[] = [
     contactPhone: '+32 9 123 45 67',
     contactEmail: 'tech@uzgent.be',
     plannedQuarter: 'Q2',
-    lat: 51.0543, // Gent
+    lat: 51.0543,
     lng: 3.7174,
     lastUpdate: '5 min geleden'
   },
@@ -51,7 +51,7 @@ export const mockSLAs: SLA[] = [
     contactPhone: '+32 2 753 11 11',
     contactEmail: 'maintenance@brusselsairport.be',
     plannedQuarter: 'Q1',
-    lat: 50.9000, // Zaventem
+    lat: 50.9000,
     lng: 4.4833,
     lastUpdate: 'Zojuist'
   }

@@ -7,20 +7,24 @@ interface DashboardProps {
 }
 
 export const Dashboard = ({ data, onNavigate }: DashboardProps) => {
-  const activeCount = data.filter(s => s.status === 'active').length;
-  const warningCount = data.filter(s => s.status === 'warning').length;
-  const criticalCount = data.filter(s => s.status === 'critical').length;
+  // VEILIGHEID: Als data undefined is, gebruik een lege lijst []
+  // Dit voorkomt de "Cannot read properties of undefined (reading 'filter')" crash
+  const safeData = data || [];
+
+  // Nu filteren we op 'safeData' in plaats van 'data'
+  const activeCount = safeData.filter(s => s.status === 'active').length;
+  const warningCount = safeData.filter(s => s.status === 'warning').length;
+  const criticalCount = safeData.filter(s => s.status === 'critical').length;
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500">Welkom terug. Er zijn {data.length} dossiers in het systeem.</p>
+        <p className="text-slate-500">Welkom terug. Er zijn momenteel {safeData.length} dossiers in het systeem.</p>
       </header>
 
-      {/* KPI Grid met ECHTE cijfers */}
+      {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Rood - Kritiek */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-red-100 rounded-full text-red-600">
             <AlertTriangle size={24} />
@@ -31,7 +35,6 @@ export const Dashboard = ({ data, onNavigate }: DashboardProps) => {
           </div>
         </div>
 
-        {/* Oranje - Waarschuwing */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-orange-100 rounded-full text-orange-600">
             <Activity size={24} />
@@ -42,7 +45,6 @@ export const Dashboard = ({ data, onNavigate }: DashboardProps) => {
           </div>
         </div>
 
-        {/* Groen - Op Schema */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-green-100 rounded-full text-green-600">
             <CheckCircle size={24} />
@@ -54,7 +56,6 @@ export const Dashboard = ({ data, onNavigate }: DashboardProps) => {
         </div>
       </div>
       
-      {/* Navigatie Knoppen */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <button 
           onClick={() => onNavigate('list')}
