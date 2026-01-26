@@ -16,7 +16,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
     hoursRequired: initialData?.hoursRequired || 2,
-    plannedMonth: initialData?.plannedMonth || 1, // Default Januari
+    plannedMonth: initialData?.plannedMonth || 1, 
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
     contactEmail: initialData?.contactEmail || '',
@@ -52,25 +52,29 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 space-y-8">
           
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center gap-4">
-            <div className="bg-white p-2 rounded-full text-blue-600 shadow-sm">
-              <CheckSquare size={24} />
+          {/* AANPASSING: ALLEEN ZICHTBAAR BIJ BEWERKEN (als initialData bestaat) */}
+          {initialData && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center gap-4">
+              <div className="bg-white p-2 rounded-full text-blue-600 shadow-sm">
+                <CheckSquare size={24} />
+              </div>
+              <div className="flex-1">
+                <label className="font-semibold text-slate-900 cursor-pointer select-none flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    checked={formData.isExecuted}
+                    onChange={e => setFormData({...formData, isExecuted: e.target.checked})}
+                  />
+                  Interventie is reeds uitgevoerd
+                </label>
+                <p className="text-sm text-slate-500 ml-7">Vink dit aan als het werk voltooid is.</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <label className="font-semibold text-slate-900 cursor-pointer select-none flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                  checked={formData.isExecuted}
-                  onChange={e => setFormData({...formData, isExecuted: e.target.checked})}
-                />
-                Interventie is reeds uitgevoerd
-              </label>
-              <p className="text-sm text-slate-500 ml-7">Vink dit aan als het werk voltooid is.</p>
-            </div>
-          </div>
+          )}
 
-          {/* ... (Bedrijfsgegevens blijven hetzelfde) ... */}
+          {/* ... De rest van het formulier blijft ongewijzigd ... */}
+          {/* ... Bedrijfsgegevens ... */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Building size={18} className="text-blue-600" /> Bedrijfsgegevens
@@ -144,7 +148,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             </div>
           </div>
 
-           {/* NIEUWE PLANNING LOGICA MET MAANDEN */}
            <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Calendar size={18} className="text-purple-600" /> Planning Uitvoering

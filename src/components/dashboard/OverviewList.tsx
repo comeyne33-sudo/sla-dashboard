@@ -1,4 +1,4 @@
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle } from 'lucide-react';
 import type { SLA } from '../../types/sla';
 
 interface SLAListProps {
@@ -33,9 +33,8 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
         {data.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             
-            {/* --- DE ACTIEKNOPPEN --- */}
+            {/* Actie knoppen (Potlood & Vuilbak) */}
             <div className="absolute top-6 right-6 flex gap-2">
-               {/* 1. Bewerk Knop */}
                <button 
                 onClick={() => onEdit(sla)}
                 className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100"
@@ -44,7 +43,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                 <Pencil size={18} />
               </button>
 
-              {/* 2. Verwijder Knop */}
               <button 
                 onClick={() => {
                   if(window.confirm(`Weet je zeker dat je ${sla.clientName} wilt verwijderen?`)) {
@@ -58,10 +56,23 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
               </button>
             </div>
 
-            {/* Header van de kaart */}
             <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-24">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  {sla.clientName}
+                  
+                  {/* AANPASSING: STATUS INDICATOR */}
+                  {sla.isExecuted ? (
+                    <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      <CheckCircle size={12} /> Uitgevoerd
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                      <AlertCircle size={12} /> Te doen
+                    </span>
+                  )}
+
+                </h3>
                 <div className="flex items-center gap-2 text-slate-500 text-sm mt-1">
                   <MapPin size={14} /> {sla.location}, {sla.city}
                 </div>
@@ -73,7 +84,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
               </span>
             </div>
 
-            {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
