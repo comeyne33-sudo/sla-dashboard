@@ -52,7 +52,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 space-y-8">
           
-          {/* AANPASSING: ALLEEN ZICHTBAAR BIJ BEWERKEN (als initialData bestaat) */}
           {initialData && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center gap-4">
               <div className="bg-white p-2 rounded-full text-blue-600 shadow-sm">
@@ -73,8 +72,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             </div>
           )}
 
-          {/* ... De rest van het formulier blijft ongewijzigd ... */}
-          {/* ... Bedrijfsgegevens ... */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Building size={18} className="text-blue-600" /> Bedrijfsgegevens
@@ -137,8 +134,16 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Benodigde Onderdelen</label>
-                <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
+                <input 
+                  type="text" 
+                  disabled={formData.type === 'Basic'}
+                  className={`w-full p-2 border border-slate-300 rounded-lg transition-colors
+                    ${formData.type === 'Basic' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
+                  `}
+                  value={formData.type === 'Basic' ? '' : formData.partsNeeded}
+                  onChange={e => setFormData({...formData, partsNeeded: e.target.value})} 
+                  placeholder={formData.type === 'Basic' ? 'Niet van toepassing bij Basic' : ''}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>

@@ -33,7 +33,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
         {data.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             
-            {/* Actie knoppen (Potlood & Vuilbak) */}
             <div className="absolute top-6 right-6 flex gap-2">
                <button 
                 onClick={() => onEdit(sla)}
@@ -60,8 +59,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   {sla.clientName}
-                  
-                  {/* AANPASSING: STATUS INDICATOR */}
                   {sla.isExecuted ? (
                     <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                       <CheckCircle size={12} /> Uitgevoerd
@@ -71,7 +68,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                       <AlertCircle size={12} /> Te doen
                     </span>
                   )}
-
                 </h3>
                 <div className="flex items-center gap-2 text-slate-500 text-sm mt-1">
                   <MapPin size={14} /> {sla.location}, {sla.city}
@@ -87,7 +83,14 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
-                <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded}</div>
+                
+                {sla.type !== 'Basic' && (
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <Battery size={16} className="text-orange-500"/> 
+                    {sla.partsNeeded || 'Geen specifiek materiaal'}
+                  </div>
+                )}
+                
                 <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div>
               </div>
 

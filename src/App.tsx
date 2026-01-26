@@ -3,12 +3,11 @@ import type { Session } from '@supabase/supabase-js';
 import { Shell } from './components/layout/Shell';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
-import { SLAList } from './components/dashboard/OverviewList'; // <--- De juiste nieuwe lijst
+import { SLAList } from './components/dashboard/OverviewList'; // <--- Let op deze naam!
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
 import { supabase } from './lib/supabase';
 import type { SLA } from './types/sla';
-import { LogOut } from 'lucide-react';
 
 type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 
@@ -57,15 +56,11 @@ function App() {
       const data = await response.json();
       if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
     } catch (error) { console.error(error); }
-    // Fallback coördinaten (Brussel + beetje random om stapeling te voorkomen)
     return { lat: 50.8503 + (Math.random() - 0.5) * 0.02, lng: 4.3517 + (Math.random() - 0.5) * 0.02 };
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-    // 1. Coördinaten ophalen
     const coords = await fetchCoordinates(formData.location, formData.city);
-    
-    // 2. Status bepalen (voor de database)
     const mapStatus = formData.isExecuted ? 'active' : 'warning';
     
     const dataToSave = {
@@ -100,10 +95,8 @@ function App() {
   const startEditing = (item: SLA) => { setEditingItem(item); setCurrentView('add'); };
   const startNew = () => { setEditingItem(null); setCurrentView('add'); };
 
-  // NIEUWE FUNCTIE: Navigatie vanuit de Map Popup naar de Lijst
   const handleViewSLA = (id: string) => {
-    // Hier kunnen we later nog logica toevoegen om naar het specifieke item te scrollen
-    console.log("Navigeren naar ID:", id); 
+    console.log("Navigeren naar:", id);
     setCurrentView('list');
   };
 
@@ -118,13 +111,7 @@ function App() {
   }
 
   return (
-    <Shell>
-       <div className="absolute top-4 right-4 z-50">
-        <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-slate-500 hover:text-red-600 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-200">
-          <LogOut size={14} /> Uitloggen
-        </button>
-      </div>
-
+    <Shell onLogout={handleLogout}>
       {currentView === 'home' && (
         <Dashboard 
           data={slaData} 
@@ -148,7 +135,7 @@ function App() {
         <SLAMap 
           data={slaData} 
           onBack={() => setCurrentView('home')} 
-          onViewSLA={handleViewSLA} // <--- Hier geven we de functie mee aan de kaart
+          onViewSLA={handleViewSLA}
         />
       )}
 

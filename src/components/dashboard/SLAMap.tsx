@@ -9,7 +9,6 @@ const monthNames = [
   "Juli", "Augustus", "September", "Oktober", "November", "December"
 ];
 
-// Status logic (hetzelfde als dashboard)
 const getMarkerStatus = (sla: SLA) => {
   if (sla.isExecuted) return 'executed'; 
 
@@ -57,12 +56,10 @@ interface SLAMapProps {
 
 export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   const safeData = data || [];
-  // Centrum van België
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   return (
     <div className="flex flex-col space-y-4 h-full">
-      {/* Header */}
       <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
@@ -76,10 +73,6 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
         </div>
       </div>
 
-      {/* HIER ZAT HET PROBLEEM.
-          We gebruiken nu een vaste pixel hoogte (600px).
-          Dit garandeert dat de kaart zichtbaar is.
-      */}
       <div 
         className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0"
         style={{ height: '600px', width: '100%' }} 
@@ -104,31 +97,22 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
               >
                 <Popup className="min-w-[250px]">
                   <div className="p-1 space-y-3">
-                    {/* 1. Klantnaam */}
                     <h3 className="font-bold text-slate-900 text-base">{sla.clientName}</h3>
-                    
-                    {/* 2. Adres */}
                     <div className="flex items-start gap-2 text-sm text-slate-600">
                       <MapPin size={16} className="text-slate-400 mt-0.5 shrink-0" />
                       <span>{sla.location}, {sla.city}</span>
                     </div>
-                    
-                    {/* 3. Uitvoeringsmaand & Status */}
                     <div className="flex items-center gap-2 text-sm">
                        <Calendar size={16} className="text-slate-400 shrink-0" />
                        <div className="flex flex-col">
                         <span className="text-slate-600">
                           Uitvoering: <span className="font-medium">{monthNames[sla.plannedMonth] || 'Onbekend'}</span>
                         </span>
-                        
-                        {/* Status Labeltje eronder */}
                         {status === 'executed' && <span className="text-xs font-medium text-green-600">Reeds uitgevoerd</span>}
                         {status === 'critical' && <span className="text-xs font-medium text-red-600">Kritiek / Nu inplannen!</span>}
                         {status === 'upcoming' && <span className="text-xs font-medium text-orange-600">Binnenkort inplannen</span>}
                       </div>
                     </div>
-
-                    {/* 4. De Knop "Bekijk in lijst" */}
                     <button 
                       onClick={() => onViewSLA(sla.id)}
                       className="mt-2 w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium border border-blue-100"
