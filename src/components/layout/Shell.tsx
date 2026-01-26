@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, LogOut } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
 
 export const Shell = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -17,12 +17,7 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
                 <span className="text-xs text-slate-500 uppercase tracking-wider">Service Portal</span>
               </div>
             </div>
-
-            {/* Rechter kant: Uitloggen */}
-            <button className="flex items-center gap-2 text-slate-500 hover:text-blue-900 transition-colors">
-              <span className="hidden sm:inline text-sm font-medium">Afmelden</span>
-              <LogOut size={18} />
-            </button>
+            
           </div>
         </div>
       </nav>

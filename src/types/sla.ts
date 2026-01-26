@@ -1,6 +1,5 @@
 export type SLAType = 'Basic' | 'Comfort' | 'Premium';
 export type SLAStatus = 'active' | 'warning' | 'critical'; 
-export type Quarter = 'Q1' | 'Q2' | 'Q3' | 'Q4';
 
 export interface SLA {
   id: string;
@@ -11,7 +10,7 @@ export interface SLA {
   status: SLAStatus;
   partsNeeded: string;
   hoursRequired: number;
-  plannedQuarter: Quarter;
+  plannedMonth: number; 
   contactName: string;
   contactPhone: string;
   contactEmail: string;
