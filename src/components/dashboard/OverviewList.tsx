@@ -5,8 +5,15 @@ interface SLAListProps {
   data: SLA[];
   onBack: () => void;
   onDelete: (id: string) => void;
-  onEdit: (sla: SLA) => void; // <--- Zonder dit werkt het niet
+  onEdit: (sla: SLA) => void;
 }
+
+// Hulplijstje om het getal (1-12) om te zetten naar tekst
+// Index 0 laten we leeg, zodat maand 1 ook echt op index 1 (Januari) valt.
+const monthNames = [
+  "", "Januari", "Februari", "Maart", "April", "Mei", "Juni",
+  "Juli", "Augustus", "September", "Oktober", "November", "December"
+];
 
 export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
   return (
@@ -28,9 +35,9 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
         {data.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             
-            {/* --- DE ACTIEKNOPPEN (HIER MOETEN ZE STAAN) --- */}
+            {/* --- DE ACTIEKNOPPEN --- */}
             <div className="absolute top-6 right-6 flex gap-2">
-               {/* 1. Bewerk Knop (Blauw Potlood) */}
+               {/* 1. Bewerk Knop */}
                <button 
                 onClick={() => onEdit(sla)}
                 className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100"
@@ -39,7 +46,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                 <Pencil size={18} />
               </button>
 
-              {/* 2. Verwijder Knop (Rode Vuilbak) */}
+              {/* 2. Verwijder Knop */}
               <button 
                 onClick={() => {
                   if(window.confirm(`Weet je zeker dat je ${sla.clientName} wilt verwijderen?`)) {
@@ -52,8 +59,8 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
                 <Trash2 size={18} />
               </button>
             </div>
-            {/* --------------------------------------------- */}
 
+            {/* Header van de kaart */}
             <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-24">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
@@ -68,6 +75,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
               </span>
             </div>
 
+            {/* Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
@@ -77,7 +85,10 @@ export const SLAList = ({ data, onBack, onDelete, onEdit }: SLAListProps) => {
 
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Planning</div>
-                <div className="flex items-center gap-2 text-slate-700"><Calendar size={16} className="text-green-600"/> Uitvoering: {sla.plannedQuarter}</div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Calendar size={16} className="text-green-600"/> 
+                  Uitvoering: {monthNames[sla.plannedMonth] || 'Onbekend'}
+                </div>
                 <div className="flex items-center gap-2 text-slate-700"><Euro size={16} className="text-slate-400"/> € {sla.price},-</div>
               </div>
 
