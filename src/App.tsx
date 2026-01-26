@@ -60,7 +60,7 @@ function App() {
     return { lat: 50.8503 + (Math.random() - 0.5) * 0.02, lng: 4.3517 + (Math.random() - 0.5) * 0.02 };
   };
 
-  const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng'>) => {
+  const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
     const coords = await fetchCoordinates(formData.location, formData.city);
     const mapStatus = formData.isExecuted ? 'active' : 'warning';
     
