@@ -12,6 +12,9 @@ import type { SLA } from './types/sla';
 
 type View = 'home' | 'list' | 'map' | 'add' | 'manage';
 
+// AANPASSING: De nieuwe filter types toegevoegd
+export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [currentView, setCurrentView] = useState<View>('home');
@@ -19,8 +22,8 @@ function App() {
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // NIEUW: Status filter voor de lijst (wordt doorgegeven vanuit Dashboard)
-  const [listFilter, setListFilter] = useState<'all' | 'todo' | 'done'>('all');
+  // AANPASSING: State gebruikt nu het nieuwe type
+  const [listFilter, setListFilter] = useState<ListFilterType>('all');
 
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
 
@@ -94,7 +97,7 @@ function App() {
       await fetchSLAs();
       setEditingItem(null);
       setCurrentView('list');
-      setListFilter('all'); // Reset filter na opslaan
+      setListFilter('all'); 
     
     } catch (error) {
       console.error(error);
@@ -128,8 +131,8 @@ function App() {
     setListFilter('all');
   };
 
-  // NIEUW: Functie om naar de lijst te gaan MET een specifiek filter
-  const navigateToList = (filter: 'all' | 'todo' | 'done') => {
+  // AANPASSING: Accepteert nu het nieuwe type
+  const navigateToList = (filter: ListFilterType) => {
     setListFilter(filter);
     setCurrentView('list');
   };
@@ -145,7 +148,7 @@ function App() {
         <Dashboard 
           data={slaData} 
           onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
-          onNavigateToList={navigateToList} // <--- Doorsturen naar Dashboard
+          onNavigateToList={navigateToList} 
         />
       )}
       
@@ -156,7 +159,7 @@ function App() {
           onDelete={handleDeleteSLA} 
           onEdit={startEditing}
           onRefresh={fetchSLAs}
-          initialFilter={listFilter} // <--- Filter doorgeven aan de lijst
+          initialFilter={listFilter} // Geeft filter door
         />
       )}
       

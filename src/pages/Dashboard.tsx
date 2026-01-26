@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { AlertTriangle, CheckCircle, Map, Plus, Calendar, FileText, List, Calculator, X, Download } from 'lucide-react';
 import type { SLA } from '../types/sla';
 
+// AANPASSING: Type voor navigateToList uitgebreid
 interface DashboardProps {
   data: SLA[]; 
   onNavigate: (view: string) => void;
-  onNavigateToList: (filter: 'all' | 'todo' | 'done') => void; // Nieuwe prop voor slimme navigatie
+  onNavigateToList: (filter: 'all' | 'critical' | 'planning' | 'done') => void;
 }
 
 export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps) => {
   const safeData = data || [];
-  
-  // STATE VOOR DOWNLOAD POPUP
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadTarget, setDownloadTarget] = useState<{url: string, name: string} | null>(null);
   
@@ -35,7 +34,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
 
   const executedCount = safeData.filter(s => s.isExecuted).length;
 
-  // HULPFUNCTIE OM DOWNLOAD TE STARTEN
   const initiateDownload = (url: string, name: string) => {
     setDownloadTarget({ url, name });
     setShowDownloadModal(true);
@@ -63,11 +61,11 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
           </p>
         </header>
 
-        {/* KPI Grid (NU KLIKBAAR) */}
+        {/* KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           <button 
-            onClick={() => onNavigateToList('todo')}
+            onClick={() => onNavigateToList('critical')} // <--- Stuurt nu 'critical' filter
             className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 hover:shadow-md transition-all text-left"
           >
             <div className="p-3 bg-red-100 rounded-full text-red-600">
@@ -80,7 +78,7 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
           </button>
 
           <button 
-             onClick={() => onNavigateToList('todo')}
+             onClick={() => onNavigateToList('planning')} // <--- Stuurt nu 'planning' filter
              className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 hover:shadow-md transition-all text-left"
           >
             <div className="p-3 bg-orange-100 rounded-full text-orange-600">
@@ -106,10 +104,10 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
           </button>
         </div>
         
-        {/* Actie Knoppen Grid (NIEUWE INDELING) */}
+        {/* Actie Knoppen Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* RIJ 1: Bekijk Alle & Kaart (Naast elkaar) */}
+          {/* AANPASSING: Naam gewijzigd */}
           <button 
             onClick={() => onNavigateToList('all')}
             className="p-6 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition-all flex flex-col items-center justify-center gap-3 group"
@@ -117,9 +115,10 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
             <div className="p-3 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
               <List size={32} />
             </div>
-            <span className="font-semibold text-lg">Bekijk Alle Dossiers</span>
+            <span className="font-semibold text-lg">Bekijk / bewerk alle SLA's</span>
           </button>
 
+          {/* AANPASSING: Naam gewijzigd */}
           <button 
             onClick={() => onNavigate('map')}
             className="p-6 bg-emerald-600 text-white rounded-xl shadow-md hover:bg-emerald-700 transition-all flex flex-col items-center justify-center gap-3 group"
@@ -127,10 +126,9 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
             <div className="p-3 bg-white/20 rounded-full group-hover:scale-110 transition-transform">
               <Map size={32} />
             </div>
-            <span className="font-semibold text-lg">Locatie Kaart</span>
+            <span className="font-semibold text-lg">SLA's in kaart</span>
           </button>
 
-          {/* RIJ 2: Nieuwe SLA (Volledige breedte) */}
           <button 
             onClick={() => onNavigate('add')}
             className="p-8 bg-orange-500 text-white rounded-xl shadow-md hover:bg-orange-600 transition-all flex flex-row items-center justify-center gap-4 group md:col-span-2"
@@ -141,7 +139,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
             <span className="font-bold text-2xl">Nieuwe SLA Aanmaken</span>
           </button>
 
-          {/* RIJ 3: Sjablonen (Naast elkaar, met POPUP) */}
           <button 
             onClick={() => initiateDownload('/rekentool.xltm', 'rekentool.xltm')}
             className="p-6 bg-slate-800 text-white rounded-xl shadow-md hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-3 group"
@@ -165,7 +162,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList }: DashboardProps
         </div>
       </div>
 
-      {/* DOWNLOAD MODAL POPUP */}
       {showDownloadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">

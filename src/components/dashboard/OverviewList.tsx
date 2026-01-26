@@ -1,7 +1,9 @@
-import { useState, useMemo, useEffect } from 'react'; // useEffect toegevoegd
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare } from 'lucide-react';
 import type { SLA, SLAType } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
+// Importeer het type uit App (of definieer het hier opnieuw als dat makkelijker is om imports te vermijden)
+type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 interface SLAListProps {
   data: SLA[];
@@ -9,7 +11,7 @@ interface SLAListProps {
   onDelete: (id: string) => void;
   onEdit: (sla: SLA) => void;
   onRefresh: () => void;
-  initialFilter?: 'all' | 'todo' | 'done'; // <--- NIEUWE PROP
+  initialFilter?: ListFilterType; // AANPASSING: Type geüpdatet
 }
 
 const monthNames = [
@@ -32,20 +34,28 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilter = 'all' }: SLAListProps) => {
-  // We gebruiken de initialFilter als startwaarde
-  const [filterStatus, setFilterStatus] = useState<'all' | 'todo' | 'done'>(initialFilter);
+  const [filterStatus, setFilterStatus] = useState<ListFilterType>(initialFilter);
   const [filterType, setFilterType] = useState<'all' | SLAType>('all');
   const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Als de prop verandert (bijv. opnieuw navigeren), update dan de state
   useEffect(() => {
     if (initialFilter) setFilterStatus(initialFilter);
   }, [initialFilter]);
 
   const processedData = useMemo(() => {
     let result = [...data];
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    
+    // Logica voor Planning (volgende 2 maanden)
+    // Dit houdt rekening met de jaarwisseling (bijv. Dec -> Jan)
+    let nextMonth = currentMonth + 1;
+    let monthAfter = currentMonth + 2;
+    if (nextMonth > 12) nextMonth -= 12;
+    if (monthAfter > 12) monthAfter -= 12;
 
+    // 1. ZOEKEN
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(s => 
@@ -55,10 +65,25 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
       );
     }
 
-    if (filterStatus === 'todo') result = result.filter(s => !s.isExecuted);
-    if (filterStatus === 'done') result = result.filter(s => s.isExecuted);
+    // 2. FILTEREN OP STATUS (DE NIEUWE LOGICA)
+    if (filterStatus === 'critical') {
+      // Kritiek: Niet uitgevoerd EN (maand is nu of in het verleden)
+      result = result.filter(s => !s.isExecuted && s.plannedMonth <= currentMonth);
+    }
+    else if (filterStatus === 'planning') {
+      // Planning: Niet uitgevoerd EN (maand is volgende maand OF die daarna)
+      result = result.filter(s => !s.isExecuted && (s.plannedMonth === nextMonth || s.plannedMonth === monthAfter));
+    }
+    else if (filterStatus === 'done') {
+      // Uitgevoerd
+      result = result.filter(s => s.isExecuted);
+    }
+    // 'all' doet niets (toont alles)
+
+    // 3. FILTEREN OP TYPE
     if (filterType !== 'all') result = result.filter(s => s.type === filterType);
 
+    // 4. SORTEREN
     result.sort((a, b) => {
       if (sortBy === 'name') return a.clientName.localeCompare(b.clientName);
       if (sortBy === 'month') return a.plannedMonth - b.plannedMonth;
@@ -80,7 +105,14 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
           <ArrowLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Actieve Dossiers ({processedData.length})</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            {/* Dynamische titel op basis van filter */}
+            {filterStatus === 'critical' ? 'Kritieke Dossiers (Te laat/Nu)' : 
+             filterStatus === 'planning' ? 'Planning (Komende 2 maanden)' :
+             filterStatus === 'done' ? 'Uitgevoerde Dossiers' : 
+             'Alle Dossiers'} 
+            <span className="ml-2 text-slate-500 text-lg font-normal">({processedData.length})</span>
+          </h2>
           <p className="text-slate-500">Beheer filters en sortering hieronder.</p>
         </div>
       </div>
@@ -102,7 +134,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
           <div>
             <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1">
-              <Filter size={12} /> Status
+              <Filter size={12} /> Status Filter
             </label>
             <select 
               className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
@@ -110,7 +142,8 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
               onChange={(e) => setFilterStatus(e.target.value as any)}
             >
               <option value="all">Alles Tonen</option>
-              <option value="todo">Nog te doen</option>
+              <option value="critical">Kritiek (Te laat/Nu)</option>
+              <option value="planning">In Planning (Next 2 mnd)</option>
               <option value="done">Reeds uitgevoerd</option>
             </select>
           </div>
@@ -151,7 +184,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
       <div className="grid gap-4">
         {processedData.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
-            <p className="text-slate-500 font-medium">Geen dossiers gevonden die voldoen aan je zoekopdracht.</p>
+            <p className="text-slate-500 font-medium">Geen dossiers gevonden voor deze selectie.</p>
             <button onClick={() => {setSearchQuery(''); setFilterStatus('all'); setFilterType('all');}} className="mt-2 text-blue-600 text-sm hover:underline">
               Filters wissen
             </button>
