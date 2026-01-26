@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { ArrowLeft, MapPin, Calendar, ExternalLink, Filter } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import type { SLA } from '../../types/sla';
 
 const monthNames = [
@@ -29,10 +29,12 @@ const getMarkerStatus = (sla: SLA) => {
 };
 
 const createCustomIcon = (status: string) => {
-  let color = '#94a3b8'; // future (grijs)
-  if (status === 'executed') color = '#10b981'; 
-  if (status === 'critical') color = '#ef4444'; 
-  if (status === 'upcoming') color = '#f59e0b'; 
+  // HIER IS DE AANPASSING:
+  let color = '#3b82f6'; // Standaard is nu BLAUW (was grijs)
+  
+  if (status === 'executed') color = '#10b981'; // Groen
+  if (status === 'critical') color = '#ef4444'; // Rood
+  if (status === 'upcoming') color = '#f59e0b'; // Oranje
   
   return L.divIcon({
     className: 'custom-marker',
@@ -67,12 +69,15 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   // Filter de data voor de kaart
   const filteredData = safeData.filter(sla => {
     const status = getMarkerStatus(sla);
+    
+    // Logica voor de checkboxes:
     if (status === 'critical' && !showCritical) return false;
-    if (status === 'upcoming' && !showUpcoming) return false;
     if (status === 'executed' && !showExecuted) return false;
-    // 'future' statussen (verder dan 2 mnd) tonen we standaard als 'upcoming' of 'critical' aan staat, 
-    // of we kunnen er een aparte toggle voor maken. Voor nu linken we ze aan 'upcoming' voor eenvoud.
-    if (status === 'future' && !showUpcoming) return false; 
+    
+    // 'Upcoming' checkbox bestuurt nu zowel Oranje (binnenkort) als Blauw (toekomst)
+    // Zodat je "alles wat nog moet gebeuren maar niet kritiek is" samen kunt aan/uitzetten
+    if ((status === 'upcoming' || status === 'future') && !showUpcoming) return false;
+    
     return true;
   });
 
@@ -93,15 +98,16 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
           </div>
         </div>
 
-        {/* MAP FILTERS (Rechts in de header of eronder op mobiel) */}
+        {/* MAP FILTERS */}
         <div className="flex flex-wrap gap-4 text-sm font-medium">
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" className="accent-red-500 w-4 h-4" checked={showCritical} onChange={e => setShowCritical(e.target.checked)} />
             <span className="text-red-600">Kritiek</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" className="accent-orange-500 w-4 h-4" checked={showUpcoming} onChange={e => setShowUpcoming(e.target.checked)} />
-            <span className="text-orange-600">In te plannen</span>
+            {/* Tekstkleur aangepast naar blauw/oranje om aan te geven dat dit de "toekomst" is */}
+            <input type="checkbox" className="accent-blue-500 w-4 h-4" checked={showUpcoming} onChange={e => setShowUpcoming(e.target.checked)} />
+            <span className="text-slate-700">In Planning (Oranje/Blauw)</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" className="accent-green-500 w-4 h-4" checked={showExecuted} onChange={e => setShowExecuted(e.target.checked)} />
@@ -149,6 +155,7 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
                         {status === 'executed' && <span className="text-xs font-medium text-green-600">Reeds uitgevoerd</span>}
                         {status === 'critical' && <span className="text-xs font-medium text-red-600">Kritiek / Nu inplannen!</span>}
                         {status === 'upcoming' && <span className="text-xs font-medium text-orange-600">Binnenkort inplannen</span>}
+                        {status === 'future' && <span className="text-xs font-medium text-blue-600">Gepland later dit jaar</span>}
                       </div>
                     </div>
                     <button 
