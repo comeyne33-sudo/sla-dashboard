@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ExternalLink, Filter } from 'lucide-react';
 import type { SLA } from '../../types/sla';
 
 const monthNames = [
@@ -9,6 +10,7 @@ const monthNames = [
   "Juli", "Augustus", "September", "Oktober", "November", "December"
 ];
 
+// Status Logica
 const getMarkerStatus = (sla: SLA) => {
   if (sla.isExecuted) return 'executed'; 
 
@@ -27,10 +29,10 @@ const getMarkerStatus = (sla: SLA) => {
 };
 
 const createCustomIcon = (status: string) => {
-  let color = '#94a3b8'; // Standaard grijs
-  if (status === 'executed') color = '#10b981'; // Groen
-  if (status === 'critical') color = '#ef4444'; // Rood
-  if (status === 'upcoming') color = '#f59e0b'; // Oranje
+  let color = '#94a3b8'; // future (grijs)
+  if (status === 'executed') color = '#10b981'; 
+  if (status === 'critical') color = '#ef4444'; 
+  if (status === 'upcoming') color = '#f59e0b'; 
   
   return L.divIcon({
     className: 'custom-marker',
@@ -55,21 +57,56 @@ interface SLAMapProps {
 }
 
 export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
+  const [showCritical, setShowCritical] = useState(true);
+  const [showUpcoming, setShowUpcoming] = useState(true);
+  const [showExecuted, setShowExecuted] = useState(true);
+
   const safeData = data || [];
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
+  // Filter de data voor de kaart
+  const filteredData = safeData.filter(sla => {
+    const status = getMarkerStatus(sla);
+    if (status === 'critical' && !showCritical) return false;
+    if (status === 'upcoming' && !showUpcoming) return false;
+    if (status === 'executed' && !showExecuted) return false;
+    // 'future' statussen (verder dan 2 mnd) tonen we standaard als 'upcoming' of 'critical' aan staat, 
+    // of we kunnen er een aparte toggle voor maken. Voor nu linken we ze aan 'upcoming' voor eenvoud.
+    if (status === 'future' && !showUpcoming) return false; 
+    return true;
+  });
+
   return (
-    <div className="flex flex-col space-y-4 h-full">
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <ArrowLeft size={24} className="text-slate-600" />
-        </button>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <MapPin className="text-emerald-600" />
-            Locatie Overzicht
-          </h2>
-          <p className="text-slate-500 text-sm">Real-time status van {safeData.length} locaties.</p>
+    <div className="flex flex-col space-y-4 h-full relative">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <ArrowLeft size={24} className="text-slate-600" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <MapPin className="text-emerald-600" />
+              Locatie Overzicht
+            </h2>
+            <p className="text-slate-500 text-sm">Real-time status van {filteredData.length} locaties.</p>
+          </div>
+        </div>
+
+        {/* MAP FILTERS (Rechts in de header of eronder op mobiel) */}
+        <div className="flex flex-wrap gap-4 text-sm font-medium">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" className="accent-red-500 w-4 h-4" checked={showCritical} onChange={e => setShowCritical(e.target.checked)} />
+            <span className="text-red-600">Kritiek</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" className="accent-orange-500 w-4 h-4" checked={showUpcoming} onChange={e => setShowUpcoming(e.target.checked)} />
+            <span className="text-orange-600">In te plannen</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" className="accent-green-500 w-4 h-4" checked={showExecuted} onChange={e => setShowExecuted(e.target.checked)} />
+            <span className="text-green-600">Uitgevoerd</span>
+          </label>
         </div>
       </div>
 
@@ -87,7 +124,7 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {safeData.map((sla) => {
+          {filteredData.map((sla) => {
             const status = getMarkerStatus(sla);
             return (
               <Marker 
@@ -108,6 +145,7 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
                         <span className="text-slate-600">
                           Uitvoering: <span className="font-medium">{monthNames[sla.plannedMonth] || 'Onbekend'}</span>
                         </span>
+                        
                         {status === 'executed' && <span className="text-xs font-medium text-green-600">Reeds uitgevoerd</span>}
                         {status === 'critical' && <span className="text-xs font-medium text-red-600">Kritiek / Nu inplannen!</span>}
                         {status === 'upcoming' && <span className="text-xs font-medium text-orange-600">Binnenkort inplannen</span>}

@@ -15,7 +15,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     city: initialData?.city || '',
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
-    hoursRequired: initialData?.hoursRequired || 2,
+    hoursRequired: initialData?.hoursRequired || 2, // Default 2 uur
     plannedMonth: initialData?.plannedMonth || 1, 
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
@@ -122,8 +122,9 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Wrench size={18} className="text-orange-500" /> Service Level
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
+            {/* HIER ZIJN DE VELDEN VOOR PRIJS EN UREN TOEGEVOEGD */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type Contract</label>
                 <select className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
                   value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
@@ -132,6 +133,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
                   <option value="Premium">Premium</option>
                 </select>
               </div>
+              
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Benodigde Onderdelen</label>
                 <input 
@@ -145,6 +147,19 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
                   placeholder={formData.type === 'Basic' ? 'Niet van toepassing bij Basic' : ''}
                 />
               </div>
+
+              {/* HIER IS HET NIEUWE VELD VOOR UREN */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Geschatte Uren Werk</label>
+                <input 
+                  type="number" 
+                  step="0.5" // Stapjes van een half uur
+                  className="w-full p-2 border border-slate-300 rounded-lg" 
+                  value={formData.hoursRequired} 
+                  onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>
                 <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" 
