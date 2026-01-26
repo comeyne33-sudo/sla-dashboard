@@ -6,18 +6,18 @@ import { Login } from './pages/Login';
 import { SLAList } from './components/dashboard/OverviewList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
-import { Settings } from './pages/Settings'; // <--- NIEUWE IMPORT
+import { Settings } from './pages/Settings';
 import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
-import type { SLA } from './types/sla';
-import { AlertTriangle, X } from 'lucide-react'; // Iconen voor popup
+import type { SLA, UserRole } from './types/sla'; // UserRole toegevoegd
+import { AlertTriangle, X } from 'lucide-react';
 
-type View = 'home' | 'list' | 'map' | 'add' | 'settings'; // 'settings' toegevoegd
-
+type View = 'home' | 'list' | 'map' | 'add' | 'settings';
 export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('admin'); // Standaard admin
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>([]);
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
@@ -25,21 +25,20 @@ function App() {
   
   const [listFilter, setListFilter] = useState<ListFilterType>('all');
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
-
-  // NIEUW: State voor December Waarschuwing
   const [showYearEndWarning, setShowYearEndWarning] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      checkRole(session); // Check rol bij start
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      checkRole(session); // Check rol bij inloggen
     });
 
-    // CHECK VOOR DECEMBER (Maand 11 in Javascript)
     const today = new Date();
     if (today.getMonth() === 11) {
       setShowYearEndWarning(true);
@@ -48,12 +47,31 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // FUNCTIE: ROL BEPALEN
+  const checkRole = (session: Session | null) => {
+    if (session?.user?.email === 'technieker@santens.be') {
+      setUserRole('technician');
+    } else {
+      setUserRole('admin');
+    }
+  };
+
   useEffect(() => {
     if (session) fetchSLAs();
   }, [session]);
 
   const showToast = (msg: string, type: ToastType) => {
     setToast({ msg, type });
+  };
+
+  // FUNCTIE: AUDIT LOGGEN
+  const logAction = async (action: string, details: string) => {
+    if (!session?.user?.email) return;
+    await supabase.from('audit_logs').insert([{
+      user_email: session.user.email,
+      action: action,
+      details: details
+    }]);
   };
 
   const fetchSLAs = async () => {
@@ -66,7 +84,6 @@ function App() {
     else setSlaData(data as SLA[]);
   };
 
-  // ... (fetchCoordinates functie blijft hetzelfde)
   const fetchCoordinates = async (address: string, city: string) => {
     try {
       const query = `${address}, ${city}, Belgium`;
@@ -78,8 +95,7 @@ function App() {
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-     // ... (deze functie blijft hetzelfde als vorige stap)
-      try {
+    try {
       const coords = await fetchCoordinates(formData.location, formData.city);
       const mapStatus = formData.isExecuted ? 'active' : 'warning';
       
@@ -95,9 +111,13 @@ function App() {
       if (editingItem) {
         const { error: updateError } = await supabase.from('slas').update(dataToSave).eq('id', editingItem.id);
         error = updateError;
+        // LOG UPDATE
+        await logAction('UPDATE', `Dossier bijgewerkt: ${formData.clientName}`);
       } else {
         const { error: insertError } = await supabase.from('slas').insert([dataToSave]);
         error = insertError;
+        // LOG CREATE
+        await logAction('CREATE', `Nieuw dossier: ${formData.clientName}`);
       }
 
       if (error) throw error;
@@ -116,11 +136,16 @@ function App() {
   };
 
   const handleDeleteSLA = async (idToDelete: string) => {
-    // ... (blijft hetzelfde)
     try {
+      // Eerst data ophalen voor de log naam (voordat we verwijderen)
+      const item = slaData.find(s => s.id === idToDelete);
+      
       const { error } = await supabase.from('slas').delete().eq('id', idToDelete);
       if (error) throw error;
       
+      // LOG DELETE
+      await logAction('DELETE', `Dossier verwijderd: ${item?.clientName || 'Onbekend'}`);
+
       showToast('Dossier verwijderd.', 'success');
       fetchSLAs();
     } catch (error) {
@@ -128,19 +153,19 @@ function App() {
     }
   };
 
-  // NIEUW: De Jaar Reset Functie
   const handleYearReset = async () => {
     try {
-      // Zet isExecuted op FALSE voor ALLE rijen
-      // We gebruiken een kleine trick: id is niet null (dus alles)
       const { error } = await supabase
         .from('slas')
         .update({ isExecuted: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Hack om 'alles' te selecteren
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (error) throw error;
       
-      await fetchSLAs(); // Data verversen
+      // LOG RESET
+      await logAction('RESET', 'Jaarreset uitgevoerd (alle statussen gereset)');
+
+      await fetchSLAs();
     } catch (error) {
       console.error(error);
       showToast('Fout bij resetten jaar.', 'error');
@@ -151,6 +176,7 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setSlaData([]);
+    setUserRole('admin'); // Reset naar default
   };
 
   const startEditing = (item: SLA) => { setEditingItem(item); setCurrentView('add'); };
@@ -173,12 +199,12 @@ function App() {
     <Shell 
       onLogout={handleLogout} 
       onHome={() => setCurrentView('home')}
-      onSettings={() => setCurrentView('settings')} // <--- KOPPELEN
+      onSettings={() => setCurrentView('settings')}
     >
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* DE DECEMBER POPUP */}
-      {showYearEndWarning && (
+      {/* December Popup (Alleen voor ADMINS nuttig, maar mag iedereen zien) */}
+      {showYearEndWarning && userRole === 'admin' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border-l-8 border-amber-500">
             <div className="p-6">
@@ -191,25 +217,13 @@ function App() {
                   <X size={24} />
                 </button>
               </div>
-              
               <div className="space-y-4 text-slate-600">
                 <p>De jaarwisseling staat voor de deur.</p>
-                <p>
-                  <strong>Vergeet niet:</strong> Op 1 januari (of bij de start van je nieuwe werkjaar) moet je 
-                  handmatig de SLA's resetten via de instellingen.
-                </p>
                 <div className="bg-amber-50 p-3 rounded-lg text-sm border border-amber-100 text-amber-800">
                   Ga rechtsboven naar het <strong>tandwiel icoon</strong> en kies voor "Nieuw Dienstjaar Starten".
-                  Dit zet alle vinkjes terug op "Niet uitgevoerd".
                 </div>
               </div>
-
-              <button 
-                onClick={() => setShowYearEndWarning(false)}
-                className="mt-6 w-full py-3 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 transition-colors"
-              >
-                Begrepen, ik zal dit doen
-              </button>
+              <button onClick={() => setShowYearEndWarning(false)} className="mt-6 w-full py-3 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 transition-colors">Begrepen</button>
             </div>
           </div>
         </div>
@@ -219,7 +233,8 @@ function App() {
         <Dashboard 
           data={slaData} 
           onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
-          onNavigateToList={navigateToList} 
+          onNavigateToList={navigateToList}
+          userRole={userRole} // <--- NIEUW: Geef rol mee aan dashboard
         />
       )}
       
@@ -231,6 +246,7 @@ function App() {
           onEdit={startEditing}
           onRefresh={fetchSLAs}
           initialFilter={listFilter}
+          userRole={userRole} // <--- NIEUW: Geef rol mee aan lijst
         />
       )}
       
@@ -239,15 +255,21 @@ function App() {
       )}
       
       {currentView === 'add' && (
-        <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} />
+        <SLAForm 
+          key={editingItem ? editingItem.id : 'new'} 
+          onBack={() => setCurrentView('home')} 
+          onSubmit={handleSaveSLA} 
+          initialData={editingItem} 
+          userRole={userRole} // <--- NIEUW: Geef rol mee aan formulier
+        />
       )}
       
-      {/* NIEUWE SETTINGS VIEW */}
       {currentView === 'settings' && (
         <Settings 
           onBack={() => setCurrentView('home')} 
-          onResetYear={handleYearReset} 
+          onResetYear={handleYearReset}
           data={slaData}
+          userRole={userRole} // <--- NIEUW: Geef rol mee aan settings
         />
       )}
     </Shell>

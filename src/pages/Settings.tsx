@@ -1,24 +1,57 @@
-import { useState } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, MapPin, Euro, FileText, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { SLA } from '../types/sla';
+import type { SLA, UserRole, AuditLog } from '../types/sla';
 
 interface SettingsProps {
   onBack: () => void;
   onResetYear: () => Promise<void>;
-  data: SLA[]; // <--- NIEUWE PROP: We hebben de data nodig voor de export
+  data: SLA[];
+  userRole: UserRole;
 }
 
-export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
+export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps) => {
   const [loading, setLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]); // <--- Log state
   
-  // State voor wachtwoord wijzigen
   const [newPassword, setNewPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
 
-  // 1. JAAR RESET FUNCTIE
+  const [defaultCity, setDefaultCity] = useState('');
+  const [defaultPrice, setDefaultPrice] = useState('');
+  const [defaultsSaved, setDefaultsSaved] = useState(false);
+
+  useEffect(() => {
+    const savedCity = localStorage.getItem('sla_default_city');
+    const savedPrice = localStorage.getItem('sla_default_price');
+    if (savedCity) setDefaultCity(savedCity);
+    if (savedPrice) setDefaultPrice(savedPrice);
+    
+    // Logs ophalen (als admin)
+    if (userRole === 'admin') {
+      fetchLogs();
+    }
+  }, [userRole]);
+
+  const fetchLogs = async () => {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50); // Laatste 50 acties
+    
+    if (data) setAuditLogs(data as AuditLog[]);
+  };
+
+  const handleSaveDefaults = () => {
+    localStorage.setItem('sla_default_city', defaultCity);
+    localStorage.setItem('sla_default_price', defaultPrice);
+    setDefaultsSaved(true);
+    setTimeout(() => setDefaultsSaved(false), 3000);
+  };
+
   const handleResetClick = async () => {
     if (confirm("⚠️ LET OP: Weet je het zeker?\n\nHiermee zet je ALLE contracten terug op 'Niet Uitgevoerd'.\nDoe dit alleen aan het begin van het nieuwe jaar!")) {
       if (confirm("Echt zeker? Dit kan niet ongedaan worden gemaakt.")) {
@@ -30,14 +63,10 @@ export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
     }
   };
 
-  // 2. EXPORT FUNCTIE (Naar CSV)
   const handleExport = () => {
-    // Koppen van de CSV
     const headers = ['Klant', 'Stad', 'Adres', 'Type', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?'];
-    
-    // Data omzetten naar CSV formaat
     const csvContent = [
-      headers.join(';'), // Excel in België gebruikt vaak puntkomma
+      headers.join(';'), 
       ...data.map(item => [
         `"${item.clientName}"`,
         `"${item.city}"`,
@@ -50,7 +79,6 @@ export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
       ].join(';'))
     ].join('\n');
 
-    // Bestand downloaden
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -59,21 +87,17 @@ export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
     link.click();
   };
 
-  // 3. WACHTWOORD WIJZIGEN FUNCTIE
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) {
       setPwMessage('Wachtwoord moet minstens 6 tekens zijn.');
       return;
     }
-    
     setPwLoading(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setPwLoading(false);
-
-    if (error) {
-      setPwMessage('Fout: ' + error.message);
-    } else {
+    if (error) setPwMessage('Fout: ' + error.message);
+    else {
       setPwMessage('Succes! Je wachtwoord is gewijzigd.');
       setNewPassword('');
     }
@@ -86,16 +110,13 @@ export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
           <CheckCircle size={32} />
         </div>
         <h2 className="text-2xl font-bold text-green-800">Jaarreset Voltooid!</h2>
-        <p className="text-slate-600">Alle dossiers staan weer open voor het nieuwe dienstjaar.</p>
-        <button onClick={onBack} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-          Terug naar Dashboard
-        </button>
+        <button onClick={onBack} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Terug naar Dashboard</button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 pb-10">
+    <div className="max-w-3xl mx-auto space-y-8 pb-10">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
@@ -103,97 +124,126 @@ export const Settings = ({ onBack, onResetYear, data }: SettingsProps) => {
         <h2 className="text-2xl font-bold text-slate-900">Instellingen & Beheer</h2>
       </div>
 
-      {/* BLOK 1: DATA EXPORT */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Download size={20} className="text-blue-600" />
-            Data Backup & Export
-          </h3>
-          <p className="text-slate-500 mt-1 text-sm">
-            Download een lijst van al je {data.length} dossiers voor Excel of administratie.
-          </p>
+      {/* ALS TECHNIEKER: Toon melding beperkte toegang */}
+      {userRole === 'technician' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center text-blue-800">
+          <p>Je bent ingelogd als <strong>Technieker</strong>.</p>
+          <p>Je hebt geen toegang tot geavanceerde instellingen of exports.</p>
         </div>
-        <div className="p-6 bg-slate-50">
-          <button 
-            onClick={handleExport}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-100 hover:border-slate-400 transition-all shadow-sm w-full sm:w-auto"
-          >
-            <Download size={18} />
-            Downloaden als CSV (Excel)
-          </button>
-        </div>
-      </div>
+      )}
 
-      {/* BLOK 2: ACCOUNT BEVEILIGING */}
+      {/* ADMIN SECTIES (Alleen zichtbaar voor admins) */}
+      {userRole === 'admin' && (
+        <>
+          {/* STANDAARDWAARDEN */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Save size={20} className="text-blue-600" /> Standaardwaarden
+              </h3>
+            </div>
+            <div className="p-6 bg-slate-50 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><MapPin size={14} /> Standaard Stad</label>
+                  <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" value={defaultCity} onChange={e => setDefaultCity(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Euro size={14} /> Standaard Prijs (€)</label>
+                  <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" value={defaultPrice} onChange={e => setDefaultPrice(e.target.value)} />
+                </div>
+              </div>
+              <button onClick={handleSaveDefaults} className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900">
+                {defaultsSaved ? 'Opgeslagen!' : 'Instellingen Opslaan'}
+              </button>
+            </div>
+          </div>
+
+          {/* DATA EXPORT */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+             <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Download size={20} className="text-blue-600" /> Data Backup & Export</h3>
+            </div>
+            <div className="p-6 bg-slate-50">
+              <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-100 shadow-sm">
+                <Download size={18} /> Downloaden als CSV (Excel)
+              </button>
+            </div>
+          </div>
+
+          {/* AUDIT LOGS (NIEUW) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Activity size={20} className="text-blue-600" /> Audit Logboek (Laatste 50)
+              </h3>
+            </div>
+            <div className="max-h-[300px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-3">Datum</th>
+                    <th className="px-6 py-3">Gebruiker</th>
+                    <th className="px-6 py-3">Actie</th>
+                    <th className="px-6 py-3">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-3 text-slate-500">{new Date(log.created_at).toLocaleString('nl-BE')}</td>
+                      <td className="px-6 py-3 font-medium text-slate-900">{log.user_email}</td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          log.action === 'DELETE' ? 'bg-red-100 text-red-700' :
+                          log.action === 'CREATE' ? 'bg-green-100 text-green-700' :
+                          log.action === 'UPDATE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
+                        }`}>{log.action}</span>
+                      </td>
+                      <td className="px-6 py-3 text-slate-600">{log.details}</td>
+                    </tr>
+                  ))}
+                  {auditLogs.length === 0 && (
+                    <tr><td colSpan={4} className="px-6 py-4 text-center text-slate-400">Nog geen activiteiten.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* GEVARENZONE */}
+          <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+             <div className="p-6 border-b border-slate-100 bg-red-50">
+              <h3 className="text-lg font-bold text-red-800 flex items-center gap-2"><RefreshCw size={20} /> Gevarenzone: Nieuw Dienstjaar</h3>
+            </div>
+            <div className="p-6 bg-white space-y-4">
+              <div className="flex gap-4 items-start p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-sm">
+                <AlertTriangle size={20} className="shrink-0 mt-0.5 text-orange-500" />
+                <p>Hiermee worden <strong>alle dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>.</p>
+              </div>
+              <button onClick={handleResetClick} disabled={loading} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm">
+                {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* WACHTWOORD WIJZIGEN (Mag iedereen doen, ook technieker) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Lock size={20} className="text-blue-600" />
-            Wachtwoord Wijzigen
-          </h3>
-          <p className="text-slate-500 mt-1 text-sm">
-            Stel hier een nieuw wachtwoord in voor je account.
-          </p>
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Lock size={20} className="text-blue-600" /> Wachtwoord Wijzigen</h3>
         </div>
         <form onSubmit={handleChangePassword} className="p-6 bg-slate-50 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nieuw Wachtwoord</label>
             <div className="flex gap-2">
-              <input 
-                type="password" 
-                placeholder="Minimaal 6 tekens"
-                className="flex-1 p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-              />
-              <button 
-                type="submit" 
-                disabled={pwLoading || !newPassword}
-                className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {pwLoading ? '...' : <Save size={18} />}
-                Opslaan
-              </button>
+              <input type="password" placeholder="Minimaal 6 tekens" className="flex-1 p-2 border border-slate-300 rounded-lg" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              <button type="submit" disabled={pwLoading || !newPassword} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">Opslaan</button>
             </div>
           </div>
-          {pwMessage && (
-            <div className={`text-sm p-3 rounded-lg ${pwMessage.includes('Succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {pwMessage}
-            </div>
-          )}
+          {pwMessage && <div className={`text-sm p-3 rounded-lg ${pwMessage.includes('Succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{pwMessage}</div>}
         </form>
-      </div>
-
-      {/* BLOK 3: GEVARENZONE (JAAR RESET) */}
-      <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-red-50">
-          <h3 className="text-lg font-bold text-red-800 flex items-center gap-2">
-            <RefreshCw size={20} />
-            Gevarenzone: Nieuw Dienstjaar
-          </h3>
-          <p className="text-red-600 mt-1 text-sm">
-            Gebruik dit alleen op 1 januari.
-          </p>
-        </div>
-        
-        <div className="p-6 bg-white space-y-4">
-          <div className="flex gap-4 items-start p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-sm">
-            <AlertTriangle size={20} className="shrink-0 mt-0.5 text-orange-500" />
-            <p>
-              Hiermee worden <strong>alle {data.length} dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>.
-              Dit is nodig om het nieuwe jaar te starten. De historie wordt niet gewist, enkel de vinkjes worden uitgezet.
-            </p>
-          </div>
-
-          <button 
-            onClick={handleResetClick}
-            disabled={loading}
-            className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm"
-          >
-            {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
-          </button>
-        </div>
       </div>
     </div>
   );

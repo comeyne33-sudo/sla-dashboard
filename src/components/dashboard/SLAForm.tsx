@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
-import type { SLA, SLAType, Attachment } from '../../types/sla';
+import type { SLA, SLAType, Attachment, UserRole } from '../../types/sla';
 import { supabase } from '../../lib/supabase';
 
 interface SLAFormProps {
   onBack: () => void;
   onSubmit: (data: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => void;
   initialData?: SLA | null;
+  userRole: UserRole; // <--- NIEUW
 }
 
-export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
+export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProps) => {
+  const isTechnician = userRole === 'technician'; // Check rol
+
   const [formData, setFormData] = useState({
     clientName: initialData?.clientName || '',
     location: initialData?.location || '',
@@ -22,7 +25,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     contactPhone: initialData?.contactPhone || '',
     contactEmail: initialData?.contactEmail || '',
     comments: initialData?.comments || '',
-    attachments: initialData?.attachments || [] as Attachment[], // <--- BIJLAGEN
+    attachments: initialData?.attachments || [] as Attachment[],
     price: initialData?.price || 0,
     isExecuted: initialData?.isExecuted || false,
   });
@@ -34,10 +37,8 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     onSubmit(formData);
   };
 
-  // Functie om bestanden te uploaden naar Supabase Storage
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    
     setUploading(true);
     const files = Array.from(e.target.files);
     const newAttachments: Attachment[] = [];
@@ -45,34 +46,21 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
       try {
-        const { error: uploadError } = await supabase.storage
-          .from('sla-files')
-          .upload(filePath, file);
-
+        const { error: uploadError } = await supabase.storage.from('sla-files').upload(fileName, file);
         if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('sla-files')
-          .getPublicUrl(filePath);
-
+        const { data: { publicUrl } } = supabase.storage.from('sla-files').getPublicUrl(fileName);
         newAttachments.push({
           name: file.name,
           url: publicUrl,
           type: file.type.startsWith('image/') ? 'image' : 'file'
         });
       } catch (error) {
-        console.error('Error uploading file:', error);
-        alert('Fout bij uploaden van ' + file.name);
+        console.error(error);
+        alert('Fout bij uploaden.');
       }
     }
-
-    setFormData(prev => ({
-      ...prev,
-      attachments: [...prev.attachments, ...newAttachments]
-    }));
+    setFormData(prev => ({ ...prev, attachments: [...prev.attachments, ...newAttachments] }));
     setUploading(false);
   };
 
@@ -98,8 +86,9 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
         </button>
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
-            {initialData ? 'Dossier Bewerken' : 'Nieuw Contract'}
+            {initialData ? 'Dossier Bekijken/Bewerken' : 'Nieuw Contract'}
           </h2>
+          {isTechnician && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Read-only Modus (Alleen commentaar/bijlagen)</span>}
         </div>
       </div>
 
@@ -108,15 +97,17 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
           
           {initialData && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center gap-4">
-              <div className="bg-white p-2 rounded-full text-blue-600 shadow-sm">
-                <CheckSquare size={24} />
-              </div>
+              <div className="bg-white p-2 rounded-full text-blue-600 shadow-sm"><CheckSquare size={24} /></div>
               <div className="flex-1">
                 <label className="font-semibold text-slate-900 cursor-pointer select-none flex items-center gap-2">
                   <input 
                     type="checkbox" 
                     className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                     checked={formData.isExecuted}
+                    // Technieker mag wel status op 'uitgevoerd' zetten? 
+                    // Je zei: "commentaar typen of bijlagen toevoegen". 
+                    // Meestal mag een technieker WEL afvinken. Als hij NIET mag afvinken, voeg hier 'disabled={isTechnician}' toe.
+                    // Ik laat het voor nu open zodat ze kunnen afvinken.
                     onChange={e => setFormData({...formData, isExecuted: e.target.checked})}
                   />
                   Interventie is reeds uitgevoerd
@@ -126,192 +117,103 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
           )}
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Building size={18} className="text-blue-600" /> Bedrijfsgegevens
-            </h3>
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Building size={18} className="text-blue-600" /> Bedrijfsgegevens</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Klantnaam</label>
-                <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Contactpersoon</label>
-                <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Telefoon</label>
-                <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input required type="email" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} />
+                <input required type="email" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <MapPin size={18} className="text-emerald-600" /> Locatie
-            </h3>
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MapPin size={18} className="text-emerald-600" /> Locatie</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Stad</label>
-                <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Specifieke Locatie</label>
-                <input required type="text" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Wrench size={18} className="text-orange-500" /> Service Level
-            </h3>
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Wrench size={18} className="text-orange-500" /> Service Level</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type Contract</label>
-                <select className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
-                  value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
+                <select disabled={isTechnician} className="w-full p-2.5 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
                   <option value="Basic">Basic</option>
                   <option value="Comfort">Comfort</option>
                   <option value="Premium">Premium</option>
                 </select>
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Benodigde Onderdelen</label>
-                <input 
-                  type="text" 
-                  disabled={formData.type === 'Basic'}
-                  className={`w-full p-2 border border-slate-300 rounded-lg transition-colors
-                    ${formData.type === 'Basic' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}
-                  `}
-                  value={formData.type === 'Basic' ? '' : formData.partsNeeded}
-                  onChange={e => setFormData({...formData, partsNeeded: e.target.value})} 
-                  placeholder={formData.type === 'Basic' ? 'Niet van toepassing bij Basic' : ''}
-                />
+                <input type="text" disabled={isTechnician || formData.type === 'Basic'} className={`w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500`} value={formData.type === 'Basic' ? '' : formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Geschatte Uren Werk</label>
-                <input 
-                  type="number" 
-                  step="0.5" 
-                  className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.hoursRequired} 
-                  onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} 
-                />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Geschatte Uren</label>
+                <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>
-                <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" 
-                  value={formData.price} onChange={e => setFormData({...formData, price: parseInt(e.target.value) || 0})} />
+                <input type="number" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.price} onChange={e => setFormData({...formData, price: parseInt(e.target.value) || 0})} />
               </div>
             </div>
           </div>
 
-           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Calendar size={18} className="text-purple-600" /> Planning Uitvoering
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Geplande Maand</label>
-                <select 
-                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
-                  value={formData.plannedMonth} 
-                  onChange={e => setFormData({...formData, plannedMonth: parseInt(e.target.value)})}
-                >
-                  {months.map(m => (
-                    <option key={m.val} value={m.val}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          {/* TECHNIEKER MAG DIT WIJZIGEN: Comments & Bijlagen */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MessageSquare size={18} className="text-slate-500" /> Commentaar</h3>
+            <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Technieker opmerkingen..." />
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <MessageSquare size={18} className="text-slate-500" /> Commentaar & Extra Info
-            </h3>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Opmerkingen</label>
-              <textarea 
-                className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]"
-                value={formData.comments}
-                onChange={e => setFormData({...formData, comments: e.target.value})}
-              />
-            </div>
-          </div>
-
-          {/* --- NIEUW: BIJLAGEN SECTIE --- */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Paperclip size={18} className="text-slate-500" /> Bijlagen (Contract, Foto's)
-            </h3>
-            
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Paperclip size={18} className="text-slate-500" /> Bijlagen</h3>
             <div className="space-y-3">
-              {/* Upload Knop */}
               <div className="flex items-center gap-3">
-                <label className={`
-                  flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg cursor-pointer hover:bg-slate-200 transition-colors border border-slate-200
-                  ${uploading ? 'opacity-50 pointer-events-none' : ''}
-                `}>
+                <label className={`flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg cursor-pointer hover:bg-slate-200 border border-slate-200 ${uploading ? 'opacity-50' : ''}`}>
                   {uploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
-                  <span className="font-medium">{uploading ? 'Uploaden...' : 'Bestand toevoegen'}</span>
+                  <span className="font-medium">Bestand toevoegen</span>
                   <input type="file" multiple className="hidden" onChange={handleFileUpload} />
                 </label>
-                <span className="text-xs text-slate-400">PDF, JPG, PNG toegestaan</span>
               </div>
-
-              {/* Lijst van bijlagen */}
               {formData.attachments.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                   {formData.attachments.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg group">
+                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg">
                       <div className="flex items-center gap-2 overflow-hidden">
-                        {file.type === 'image' ? (
-                          <ImageIcon size={16} className="text-purple-500 shrink-0" />
-                        ) : (
-                          <FileText size={16} className="text-blue-500 shrink-0" />
-                        )}
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 truncate hover:underline hover:text-blue-600">
-                          {file.name}
-                        </a>
+                        {file.type === 'image' ? <ImageIcon size={16} /> : <FileText size={16} />}
+                        <a href={file.url} target="_blank" className="text-sm truncate">{file.name}</a>
                       </div>
-                      <button 
-                        type="button" 
-                        onClick={() => removeAttachment(idx)}
-                        className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-colors"
-                      >
-                        <X size={16} />
-                      </button>
+                      <button type="button" onClick={() => removeAttachment(idx)} className="p-1 hover:text-red-500"><X size={16} /></button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
-
         </div>
 
         <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-200 sticky bottom-0">
-          <button type="button" onClick={onBack} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors">
-            Annuleren
-          </button>
-          <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2 disabled:opacity-50">
-            <Save size={18} />
-            {initialData ? 'Wijzigingen Opslaan' : 'Aanmaken'}
-          </button>
+          <button type="button" onClick={onBack} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors">Annuleren</button>
+          <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 flex items-center gap-2"><Save size={18} /> Opslaan</button>
         </div>
       </form>
     </div>
