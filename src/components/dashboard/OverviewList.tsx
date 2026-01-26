@@ -1,14 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react'; // useEffect toegevoegd
 import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare } from 'lucide-react';
 import type { SLA, SLAType } from '../../types/sla';
-import { AttachmentManager } from './AttachmentManager'; // <--- IMPORT
+import { AttachmentManager } from './AttachmentManager';
 
 interface SLAListProps {
   data: SLA[];
   onBack: () => void;
   onDelete: (id: string) => void;
   onEdit: (sla: SLA) => void;
-  onRefresh: () => void; // <--- NIEUWE PROP
+  onRefresh: () => void;
+  initialFilter?: 'all' | 'todo' | 'done'; // <--- NIEUWE PROP
 }
 
 const monthNames = [
@@ -30,11 +31,17 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; 
 };
 
-export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh }: SLAListProps) => {
-  const [filterStatus, setFilterStatus] = useState<'all' | 'todo' | 'done'>('all');
+export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilter = 'all' }: SLAListProps) => {
+  // We gebruiken de initialFilter als startwaarde
+  const [filterStatus, setFilterStatus] = useState<'all' | 'todo' | 'done'>(initialFilter);
   const [filterType, setFilterType] = useState<'all' | SLAType>('all');
   const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Als de prop verandert (bijv. opnieuw navigeren), update dan de state
+  useEffect(() => {
+    if (initialFilter) setFilterStatus(initialFilter);
+  }, [initialFilter]);
 
   const processedData = useMemo(() => {
     let result = [...data];
@@ -154,16 +161,11 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh }: SLAListPr
         {processedData.map((sla) => (
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             
-            {/* ACTIE KNOPPEN */}
             <div className="absolute top-6 right-6 flex gap-2 items-center">
-               
-               {/* HIER ZIT DE NIEUWE PAPERCLIP LOGICA */}
                <AttachmentManager sla={sla} onUpdate={onRefresh} />
-
                <button onClick={() => onEdit(sla)} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100">
                 <Pencil size={18} />
               </button>
-              
               <button 
                 onClick={() => { if(window.confirm(`Verwijderen?`)) onDelete(sla.id); }}
                 className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100"
@@ -172,7 +174,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh }: SLAListPr
               </button>
             </div>
 
-            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-32"> {/* pr-32 vergroot om ruimte te maken voor knoppen */}
+            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-32">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   {sla.clientName}
@@ -227,7 +229,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh }: SLAListPr
               </div>
             </div>
 
-            {/* ALLEEN COMMENTAAR HIER ONDERAAN (Bijlagen zitten nu in de popup) */}
             {sla.comments && (
               <div className="mt-4 pt-4 border-t border-slate-100">
                  <div className="text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start">

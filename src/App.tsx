@@ -18,6 +18,9 @@ function App() {
   const [slaData, setSlaData] = useState<SLA[]>([]);
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // NIEUW: Status filter voor de lijst (wordt doorgegeven vanuit Dashboard)
+  const [listFilter, setListFilter] = useState<'all' | 'todo' | 'done'>('all');
 
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
 
@@ -91,6 +94,7 @@ function App() {
       await fetchSLAs();
       setEditingItem(null);
       setCurrentView('list');
+      setListFilter('all'); // Reset filter na opslaan
     
     } catch (error) {
       console.error(error);
@@ -121,18 +125,28 @@ function App() {
 
   const handleViewSLA = (id: string) => {
     setCurrentView('list');
+    setListFilter('all');
+  };
+
+  // NIEUW: Functie om naar de lijst te gaan MET een specifiek filter
+  const navigateToList = (filter: 'all' | 'todo' | 'done') => {
+    setListFilter(filter);
+    setCurrentView('list');
   };
 
   if (loading && !session) return <div className="min-h-screen flex items-center justify-center text-blue-600">Laden...</div>;
   if (!session) return <Login />;
 
   return (
-    // HIER GEVEN WE DE "TERUG NAAR HOME" FUNCTIE MEE AAN SHELL
     <Shell onLogout={handleLogout} onHome={() => setCurrentView('home')}>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       {currentView === 'home' && (
-        <Dashboard data={slaData} onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} />
+        <Dashboard 
+          data={slaData} 
+          onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
+          onNavigateToList={navigateToList} // <--- Doorsturen naar Dashboard
+        />
       )}
       
       {currentView === 'list' && (
@@ -142,6 +156,7 @@ function App() {
           onDelete={handleDeleteSLA} 
           onEdit={startEditing}
           onRefresh={fetchSLAs}
+          initialFilter={listFilter} // <--- Filter doorgeven aan de lijst
         />
       )}
       
