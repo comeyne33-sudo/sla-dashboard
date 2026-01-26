@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, MapPin, Euro, FileText, Activity } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { SLA, UserRole, AuditLog } from '../types/sla';
 
@@ -13,22 +13,13 @@ interface SettingsProps {
 export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps) => {
   const [loading, setLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]); // <--- Log state
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
   const [newPassword, setNewPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
 
-  const [defaultCity, setDefaultCity] = useState('');
-  const [defaultPrice, setDefaultPrice] = useState('');
-  const [defaultsSaved, setDefaultsSaved] = useState(false);
-
   useEffect(() => {
-    const savedCity = localStorage.getItem('sla_default_city');
-    const savedPrice = localStorage.getItem('sla_default_price');
-    if (savedCity) setDefaultCity(savedCity);
-    if (savedPrice) setDefaultPrice(savedPrice);
-    
     // Logs ophalen (als admin)
     if (userRole === 'admin') {
       fetchLogs();
@@ -43,13 +34,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
       .limit(50); // Laatste 50 acties
     
     if (data) setAuditLogs(data as AuditLog[]);
-  };
-
-  const handleSaveDefaults = () => {
-    localStorage.setItem('sla_default_city', defaultCity);
-    localStorage.setItem('sla_default_price', defaultPrice);
-    setDefaultsSaved(true);
-    setTimeout(() => setDefaultsSaved(false), 3000);
   };
 
   const handleResetClick = async () => {
@@ -135,30 +119,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
       {/* ADMIN SECTIES (Alleen zichtbaar voor admins) */}
       {userRole === 'admin' && (
         <>
-          {/* STANDAARDWAARDEN */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Save size={20} className="text-blue-600" /> Standaardwaarden
-              </h3>
-            </div>
-            <div className="p-6 bg-slate-50 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><MapPin size={14} /> Standaard Stad</label>
-                  <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" value={defaultCity} onChange={e => setDefaultCity(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Euro size={14} /> Standaard Prijs (€)</label>
-                  <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" value={defaultPrice} onChange={e => setDefaultPrice(e.target.value)} />
-                </div>
-              </div>
-              <button onClick={handleSaveDefaults} className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900">
-                {defaultsSaved ? 'Opgeslagen!' : 'Instellingen Opslaan'}
-              </button>
-            </div>
-          </div>
-
           {/* DATA EXPORT */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
              <div className="p-6 border-b border-slate-100">
@@ -171,7 +131,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
             </div>
           </div>
 
-          {/* AUDIT LOGS (NIEUW) */}
+          {/* AUDIT LOGS */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -210,26 +170,10 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
               </table>
             </div>
           </div>
-
-          {/* GEVARENZONE */}
-          <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-             <div className="p-6 border-b border-slate-100 bg-red-50">
-              <h3 className="text-lg font-bold text-red-800 flex items-center gap-2"><RefreshCw size={20} /> Gevarenzone: Nieuw Dienstjaar</h3>
-            </div>
-            <div className="p-6 bg-white space-y-4">
-              <div className="flex gap-4 items-start p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-sm">
-                <AlertTriangle size={20} className="shrink-0 mt-0.5 text-orange-500" />
-                <p>Hiermee worden <strong>alle dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>.</p>
-              </div>
-              <button onClick={handleResetClick} disabled={loading} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm">
-                {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
-              </button>
-            </div>
-          </div>
         </>
       )}
 
-      {/* WACHTWOORD WIJZIGEN (Mag iedereen doen, ook technieker) */}
+      {/* WACHTWOORD WIJZIGEN (Mag iedereen doen) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Lock size={20} className="text-blue-600" /> Wachtwoord Wijzigen</h3>
@@ -245,6 +189,24 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
           {pwMessage && <div className={`text-sm p-3 rounded-lg ${pwMessage.includes('Succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{pwMessage}</div>}
         </form>
       </div>
+
+      {/* GEVARENZONE (Onderaan) */}
+      {userRole === 'admin' && (
+        <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+           <div className="p-6 border-b border-slate-100 bg-red-50">
+            <h3 className="text-lg font-bold text-red-800 flex items-center gap-2"><RefreshCw size={20} /> Gevarenzone: Nieuw Dienstjaar</h3>
+          </div>
+          <div className="p-6 bg-white space-y-4">
+            <div className="flex gap-4 items-start p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-sm">
+              <AlertTriangle size={20} className="shrink-0 mt-0.5 text-orange-500" />
+              <p>Hiermee worden <strong>alle dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>. <br/> Doe dit alleen bij de start van een nieuw dienstjaar.</p>
+            </div>
+            <button onClick={handleResetClick} disabled={loading} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm">
+              {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
