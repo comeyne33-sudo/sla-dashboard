@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare } from 'lucide-react';
-import type { SLA, SLAType, Quarter } from '../../types/sla';
+import type { SLA, SLAType } from '../../types/sla';
 
 interface SLAFormProps {
   onBack: () => void;
-  // AANPASSING HIERONDER: We voegen 'lastUpdate' toe aan de Omit lijst
   onSubmit: (data: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => void;
   initialData?: SLA | null;
 }
@@ -17,7 +16,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
     hoursRequired: initialData?.hoursRequired || 2,
-    plannedQuarter: (initialData?.plannedQuarter || 'Q1') as Quarter,
+    plannedMonth: initialData?.plannedMonth || 1, // Default Januari
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
     contactEmail: initialData?.contactEmail || '',
@@ -29,6 +28,13 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
     e.preventDefault();
     onSubmit(formData);
   };
+
+  const months = [
+    { val: 1, label: 'Januari' }, { val: 2, label: 'Februari' }, { val: 3, label: 'Maart' },
+    { val: 4, label: 'April' }, { val: 5, label: 'Mei' }, { val: 6, label: 'Juni' },
+    { val: 7, label: 'Juli' }, { val: 8, label: 'Augustus' }, { val: 9, label: 'September' },
+    { val: 10, label: 'Oktober' }, { val: 11, label: 'November' }, { val: 12, label: 'December' }
+  ];
 
   return (
     <div className="max-w-3xl mx-auto h-full overflow-y-auto pb-10">
@@ -64,6 +70,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             </div>
           </div>
 
+          {/* ... (Bedrijfsgegevens blijven hetzelfde) ... */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
               <Building size={18} className="text-blue-600" /> Bedrijfsgegevens
@@ -137,19 +144,22 @@ export const SLAForm = ({ onBack, onSubmit, initialData }: SLAFormProps) => {
             </div>
           </div>
 
+           {/* NIEUWE PLANNING LOGICA MET MAANDEN */}
            <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Calendar size={18} className="text-purple-600" /> Planning
+              <Calendar size={18} className="text-purple-600" /> Planning Uitvoering
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Gepland Kwartaal</label>
-                <select className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
-                  value={formData.plannedQuarter} onChange={e => setFormData({...formData, plannedQuarter: e.target.value as Quarter})}>
-                  <option value="Q1">Q1 (Jan-Mrt)</option>
-                  <option value="Q2">Q2 (Apr-Jun)</option>
-                  <option value="Q3">Q3 (Jul-Sep)</option>
-                  <option value="Q4">Q4 (Okt-Dec)</option>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Geplande Maand</label>
+                <select 
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
+                  value={formData.plannedMonth} 
+                  onChange={e => setFormData({...formData, plannedMonth: parseInt(e.target.value)})}
+                >
+                  {months.map(m => (
+                    <option key={m.val} value={m.val}>{m.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
