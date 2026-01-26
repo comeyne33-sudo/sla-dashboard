@@ -6,13 +6,14 @@ import { Login } from './pages/Login';
 import { SLAList } from './components/dashboard/OverviewList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
+import { Settings } from './pages/Settings'; // <--- NIEUWE IMPORT
 import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
 import type { SLA } from './types/sla';
+import { AlertTriangle, X } from 'lucide-react'; // Iconen voor popup
 
-type View = 'home' | 'list' | 'map' | 'add' | 'manage';
+type View = 'home' | 'list' | 'map' | 'add' | 'settings'; // 'settings' toegevoegd
 
-// AANPASSING: De nieuwe filter types toegevoegd
 export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 function App() {
@@ -22,10 +23,11 @@ function App() {
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // AANPASSING: State gebruikt nu het nieuwe type
   const [listFilter, setListFilter] = useState<ListFilterType>('all');
-
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
+
+  // NIEUW: State voor December Waarschuwing
+  const [showYearEndWarning, setShowYearEndWarning] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,6 +38,12 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
+    // CHECK VOOR DECEMBER (Maand 11 in Javascript)
+    const today = new Date();
+    if (today.getMonth() === 11) {
+      setShowYearEndWarning(true);
+    }
 
     return () => subscription.unsubscribe();
   }, []);
@@ -58,6 +66,7 @@ function App() {
     else setSlaData(data as SLA[]);
   };
 
+  // ... (fetchCoordinates functie blijft hetzelfde)
   const fetchCoordinates = async (address: string, city: string) => {
     try {
       const query = `${address}, ${city}, Belgium`;
@@ -69,7 +78,8 @@ function App() {
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-    try {
+     // ... (deze functie blijft hetzelfde als vorige stap)
+      try {
       const coords = await fetchCoordinates(formData.location, formData.city);
       const mapStatus = formData.isExecuted ? 'active' : 'warning';
       
@@ -106,6 +116,7 @@ function App() {
   };
 
   const handleDeleteSLA = async (idToDelete: string) => {
+    // ... (blijft hetzelfde)
     try {
       const { error } = await supabase.from('slas').delete().eq('id', idToDelete);
       if (error) throw error;
@@ -114,6 +125,25 @@ function App() {
       fetchSLAs();
     } catch (error) {
       showToast('Kon dossier niet verwijderen.', 'error');
+    }
+  };
+
+  // NIEUW: De Jaar Reset Functie
+  const handleYearReset = async () => {
+    try {
+      // Zet isExecuted op FALSE voor ALLE rijen
+      // We gebruiken een kleine trick: id is niet null (dus alles)
+      const { error } = await supabase
+        .from('slas')
+        .update({ isExecuted: false })
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Hack om 'alles' te selecteren
+
+      if (error) throw error;
+      
+      await fetchSLAs(); // Data verversen
+    } catch (error) {
+      console.error(error);
+      showToast('Fout bij resetten jaar.', 'error');
     }
   };
 
@@ -131,7 +161,6 @@ function App() {
     setListFilter('all');
   };
 
-  // AANPASSING: Accepteert nu het nieuwe type
   const navigateToList = (filter: ListFilterType) => {
     setListFilter(filter);
     setCurrentView('list');
@@ -141,8 +170,50 @@ function App() {
   if (!session) return <Login />;
 
   return (
-    <Shell onLogout={handleLogout} onHome={() => setCurrentView('home')}>
+    <Shell 
+      onLogout={handleLogout} 
+      onHome={() => setCurrentView('home')}
+      onSettings={() => setCurrentView('settings')} // <--- KOPPELEN
+    >
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* DE DECEMBER POPUP */}
+      {showYearEndWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border-l-8 border-amber-500">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3 text-amber-600 font-bold text-xl">
+                  <AlertTriangle size={28} />
+                  <h2>Jaarwissel Opgelet!</h2>
+                </div>
+                <button onClick={() => setShowYearEndWarning(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4 text-slate-600">
+                <p>De jaarwisseling staat voor de deur.</p>
+                <p>
+                  <strong>Vergeet niet:</strong> Op 1 januari (of bij de start van je nieuwe werkjaar) moet je 
+                  handmatig de SLA's resetten via de instellingen.
+                </p>
+                <div className="bg-amber-50 p-3 rounded-lg text-sm border border-amber-100 text-amber-800">
+                  Ga rechtsboven naar het <strong>tandwiel icoon</strong> en kies voor "Nieuw Dienstjaar Starten".
+                  Dit zet alle vinkjes terug op "Niet uitgevoerd".
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowYearEndWarning(false)}
+                className="mt-6 w-full py-3 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 transition-colors"
+              >
+                Begrepen, ik zal dit doen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {currentView === 'home' && (
         <Dashboard 
@@ -159,7 +230,7 @@ function App() {
           onDelete={handleDeleteSLA} 
           onEdit={startEditing}
           onRefresh={fetchSLAs}
-          initialFilter={listFilter} // Geeft filter door
+          initialFilter={listFilter}
         />
       )}
       
@@ -171,11 +242,12 @@ function App() {
         <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} />
       )}
       
-      {currentView === 'manage' && (
-        <div className="p-8 text-center bg-white rounded-xl border">
-          Beheer functionaliteit volgt. 
-          <button onClick={() => setCurrentView('home')} className="text-blue-600 underline ml-2">Terug</button>
-        </div>
+      {/* NIEUWE SETTINGS VIEW */}
+      {currentView === 'settings' && (
+        <Settings 
+          onBack={() => setCurrentView('home')} 
+          onResetYear={handleYearReset} 
+        />
       )}
     </Shell>
   );

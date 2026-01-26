@@ -1,20 +1,21 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react'; // Settings icoon toegevoegd
 
 interface ShellProps { 
   children: React.ReactNode;
   onLogout: () => void;
-  onHome: () => void; // <--- NIEUW: Functie om naar home te gaan
+  onHome: () => void;
+  onSettings: () => void; // <--- NIEUWE PROP
 }
 
-export const Shell = ({ children, onLogout, onHome }: ShellProps) => {
+export const Shell = ({ children, onLogout, onHome, onSettings }: ShellProps) => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20 items-center">
             
-            {/* Linker kant: Logo en Titel (NU KLIKBAAR) */}
+            {/* Linker kant: Logo */}
             <button 
               onClick={onHome}
               className="flex items-center gap-4 hover:opacity-75 transition-opacity text-left"
@@ -33,14 +34,28 @@ export const Shell = ({ children, onLogout, onHome }: ShellProps) => {
               </div>
             </button>
 
-            {/* Rechter kant: Uitloggen */}
-            <button 
-              onClick={onLogout} 
-              className="flex items-center gap-2 text-slate-500 hover:text-red-600 font-medium transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
-            >
-              <span>Afmelden</span>
-              <LogOut size={20} />
-            </button>
+            {/* Rechter kant: Knoppen */}
+            <div className="flex items-center gap-2">
+              
+              {/* NIEUW: Instellingen Knop */}
+              <button 
+                onClick={onSettings}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Instellingen"
+              >
+                <Settings size={24} />
+              </button>
+
+              <div className="h-6 w-px bg-slate-200 mx-2"></div>
+
+              <button 
+                onClick={onLogout} 
+                className="flex items-center gap-2 text-slate-500 hover:text-red-600 font-medium transition-colors px-3 py-2 rounded-lg hover:bg-slate-50"
+              >
+                <span>Afmelden</span>
+                <LogOut size={20} />
+              </button>
+            </div>
 
           </div>
         </div>
