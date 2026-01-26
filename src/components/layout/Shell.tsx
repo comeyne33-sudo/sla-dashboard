@@ -3,18 +3,23 @@ import { LogOut } from 'lucide-react';
 
 interface ShellProps { 
   children: React.ReactNode;
-  onLogout: () => void; 
+  onLogout: () => void;
+  onHome: () => void; // <--- NIEUW: Functie om naar home te gaan
 }
 
-export const Shell = ({ children, onLogout }: ShellProps) => {
+export const Shell = ({ children, onLogout, onHome }: ShellProps) => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20 items-center">
             
-            {/* Linker kant: Logo en Titel */}
-            <div className="flex items-center gap-4">
+            {/* Linker kant: Logo en Titel (NU KLIKBAAR) */}
+            <button 
+              onClick={onHome}
+              className="flex items-center gap-4 hover:opacity-75 transition-opacity text-left"
+              title="Terug naar Dashboard"
+            >
               <img 
                 src="/logo.png" 
                 alt="Logo" 
@@ -26,7 +31,7 @@ export const Shell = ({ children, onLogout }: ShellProps) => {
                 <span className="font-bold text-slate-900 text-xl leading-tight">Santens Automatics</span>
                 <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Service Portal</span>
               </div>
-            </div>
+            </button>
 
             {/* Rechter kant: Uitloggen */}
             <button 

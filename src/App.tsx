@@ -120,7 +120,6 @@ function App() {
   const startNew = () => { setEditingItem(null); setCurrentView('add'); };
 
   const handleViewSLA = (id: string) => {
-    console.log("Navigeren naar:", id);
     setCurrentView('list');
   };
 
@@ -128,7 +127,8 @@ function App() {
   if (!session) return <Login />;
 
   return (
-    <Shell onLogout={handleLogout}>
+    // HIER GEVEN WE DE "TERUG NAAR HOME" FUNCTIE MEE AAN SHELL
+    <Shell onLogout={handleLogout} onHome={() => setCurrentView('home')}>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       {currentView === 'home' && (
@@ -141,7 +141,7 @@ function App() {
           onBack={() => setCurrentView('home')} 
           onDelete={handleDeleteSLA} 
           onEdit={startEditing}
-          onRefresh={fetchSLAs} // <--- HIER GEVEN WE DE REFRESH FUNCTIE MEE
+          onRefresh={fetchSLAs}
         />
       )}
       
