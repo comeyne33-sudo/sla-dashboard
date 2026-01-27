@@ -7,11 +7,11 @@ interface SLAFormProps {
   onBack: () => void;
   onSubmit: (data: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => void;
   initialData?: SLA | null;
-  userRole: UserRole; // <--- NIEUW
+  userRole: UserRole;
 }
 
 export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProps) => {
-  const isTechnician = userRole === 'technician'; // Check rol
+  const isTechnician = userRole === 'technician';
 
   const [formData, setFormData] = useState({
     clientName: initialData?.clientName || '',
@@ -104,10 +104,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                     type="checkbox" 
                     className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                     checked={formData.isExecuted}
-                    // Technieker mag wel status op 'uitgevoerd' zetten? 
-                    // Je zei: "commentaar typen of bijlagen toevoegen". 
-                    // Meestal mag een technieker WEL afvinken. Als hij NIET mag afvinken, voeg hier 'disabled={isTechnician}' toe.
-                    // Ik laat het voor nu open zodat ze kunnen afvinken.
                     onChange={e => setFormData({...formData, isExecuted: e.target.checked})}
                   />
                   Interventie is reeds uitgevoerd
@@ -178,7 +174,28 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             </div>
           </div>
 
-          {/* TECHNIEKER MAG DIT WIJZIGEN: Comments & Bijlagen */}
+          {/* HIER IS HET TERUGGEZETTE BLOK PLANNING */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
+              <Calendar size={18} className="text-purple-600" /> Planning Uitvoering
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Geplande Maand</label>
+                <select 
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                  value={formData.plannedMonth} 
+                  onChange={e => setFormData({...formData, plannedMonth: parseInt(e.target.value)})}
+                  disabled={isTechnician} // Alleen admin mag plannen
+                >
+                  {months.map(m => (
+                    <option key={m.val} value={m.val}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MessageSquare size={18} className="text-slate-500" /> Commentaar</h3>
             <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Technieker opmerkingen..." />
@@ -200,7 +217,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                     <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg">
                       <div className="flex items-center gap-2 overflow-hidden">
                         {file.type === 'image' ? <ImageIcon size={16} /> : <FileText size={16} />}
-                        <a href={file.url} target="_blank" className="text-sm truncate">{file.name}</a>
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm truncate">{file.name}</a>
                       </div>
                       <button type="button" onClick={() => removeAttachment(idx)} className="p-1 hover:text-red-500"><X size={16} /></button>
                     </div>

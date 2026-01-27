@@ -1,13 +1,10 @@
-// ... imports blijven hetzelfde ...
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare, RotateCcw } from 'lucide-react';
 import type { SLA, SLAType, UserRole } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
 
-// ... (ListFilterType en functies blijven hetzelfde)
 type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
-// ... (Calculate distance, monthNames etc blijven hetzelfde)
 const monthNames = [ "", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December" ];
 const BASE_LAT = 50.9904;
 const BASE_LNG = 3.7632;
@@ -27,17 +24,25 @@ interface SLAListProps {
   onEdit: (sla: SLA) => void;
   onRefresh: () => void;
   initialFilter?: ListFilterType;
-  userRole: UserRole; // <--- NIEUWE PROP
+  userRole: UserRole;
 }
 
 export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilter = 'all', userRole }: SLAListProps) => {
-  // ... (State en useEffect en processedData blijven hetzelfde)
   const [filterStatus, setFilterStatus] = useState<ListFilterType>(initialFilter);
   const [filterType, setFilterType] = useState<'all' | SLAType>('all');
   const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (initialFilter) setFilterStatus(initialFilter); }, [initialFilter]);
+
+  // Check of er actieve filters zijn (om de reset knop te tonen/verbergen)
+  const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || searchQuery !== '';
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setFilterStatus('all');
+    setFilterType('all');
+  };
 
   const processedData = useMemo(() => {
     let result = [...data];
@@ -68,24 +73,44 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
 
   return (
     <div className="space-y-6">
-      {/* ... (Header en Filter balk code blijft exact hetzelfde) ... */}
        <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Actieve Dossiers ({processedData.length})</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+             {filterStatus === 'critical' ? 'Kritieke Dossiers' : 
+             filterStatus === 'planning' ? 'Planning' :
+             filterStatus === 'done' ? 'Uitgevoerde Dossiers' : 
+             'Alle Dossiers'} 
+             <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span>
+          </h2>
           <p className="text-slate-500">Beheer filters en sortering hieronder.</p>
         </div>
       </div>
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={18} className="text-slate-400" /></div>
-          <input type="text" placeholder="Zoek op klantnaam, stad of straat..." className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        {/* BOVENBALK MET ZOEK EN RESET */}
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={18} className="text-slate-400" /></div>
+            <input type="text" placeholder="Zoek op klantnaam, stad of straat..." className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          </div>
+          
+          {/* NIEUWE RESET KNOP (Alleen zichtbaar als er filters zijn) */}
+          {hasActiveFilters && (
+            <button 
+              onClick={resetFilters}
+              className="px-4 py-2 bg-slate-100 text-slate-600 font-medium rounded-lg hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center gap-2 whitespace-nowrap"
+              title="Alles tonen"
+            >
+              <RotateCcw size={16} />
+              <span className="hidden sm:inline">Reset Filters</span>
+            </button>
+          )}
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-           {/* ... (Select boxes blijven hetzelfde) ... */}
            <div>
             <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><Filter size={12} /> Status</label>
             <select className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
@@ -119,6 +144,9 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
         {processedData.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
             <p className="text-slate-500 font-medium">Geen dossiers gevonden.</p>
+            <button onClick={resetFilters} className="mt-2 text-blue-600 text-sm hover:underline">
+              Filters wissen
+            </button>
           </div>
         )}
 
@@ -126,12 +154,9 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
           <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
             <div className="absolute top-6 right-6 flex gap-2 items-center">
                <AttachmentManager sla={sla} onUpdate={onRefresh} />
-               
                <button onClick={() => onEdit(sla)} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100">
                 <Pencil size={18} />
               </button>
-              
-              {/* ALLEEN TONEN ALS JE ADMIN BENT */}
               {userRole === 'admin' && (
                 <button 
                   onClick={() => { if(window.confirm(`Verwijderen?`)) onDelete(sla.id); }}
@@ -142,7 +167,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
               )}
             </div>
 
-            {/* ... (Rest van de kaart layout blijft hetzelfde als vorige versie) ... */}
             <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-32">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -157,7 +181,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-               {/* Grid content zelfde als vorige keer... */}
                <div className="space-y-3">
                 <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
                 {sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen specifiek materiaal'}</div>}
