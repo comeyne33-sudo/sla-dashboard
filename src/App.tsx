@@ -9,7 +9,7 @@ import { SLAForm } from './components/dashboard/SLAForm';
 import { Settings } from './pages/Settings';
 import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
-import type { SLA, UserRole } from './types/sla'; // UserRole toegevoegd
+import type { SLA, UserRole } from './types/sla';
 import { AlertTriangle, X } from 'lucide-react';
 
 type View = 'home' | 'list' | 'map' | 'add' | 'settings';
@@ -17,26 +17,45 @@ export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('admin'); // Standaard admin
+  const [userRole, setUserRole] = useState<UserRole>('admin');
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>([]);
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // NIEUW: State voor de sleutel-animatie
+  const [showKeyAnimation, setShowKeyAnimation] = useState(false);
+
   const [listFilter, setListFilter] = useState<ListFilterType>('all');
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [showYearEndWarning, setShowYearEndWarning] = useState(false);
 
   useEffect(() => {
+    // 1. Initiële sessie check (bij F5 verversen)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      checkRole(session); // Check rol bij start
+      checkRole(session);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      checkRole(session); // Check rol bij inloggen
+    // 2. Luisteren naar veranderingen (Inloggen / Uitloggen)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      
+      // HIER ZIT DE TRUC:
+      // Als het event 'SIGNED_IN' is, betekent het dat de gebruiker NET heeft ingelogd.
+      if (event === 'SIGNED_IN') {
+        setShowKeyAnimation(true);
+        // Laat de GIF 2.5 seconden spelen, daarna pas doorgaan
+        setTimeout(() => {
+          setShowKeyAnimation(false);
+          setSession(session);
+          checkRole(session);
+        }, 2500); // 2500ms = 2.5 seconden (pas aan aan de lengte van je GIF)
+      } else {
+        // Bij andere events (zoals uitloggen of token refresh) gewoon direct updaten
+        setSession(session);
+        checkRole(session);
+      }
     });
 
     const today = new Date();
@@ -47,7 +66,6 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // FUNCTIE: ROL BEPALEN
   const checkRole = (session: Session | null) => {
     if (session?.user?.email === 'technieker@santens.be') {
       setUserRole('technician');
@@ -57,14 +75,14 @@ function App() {
   };
 
   useEffect(() => {
-    if (session) fetchSLAs();
-  }, [session]);
+    // Haal data pas op als we een sessie hebben EN de animatie voorbij is
+    if (session && !showKeyAnimation) fetchSLAs();
+  }, [session, showKeyAnimation]);
 
   const showToast = (msg: string, type: ToastType) => {
     setToast({ msg, type });
   };
 
-  // FUNCTIE: AUDIT LOGGEN
   const logAction = async (action: string, details: string) => {
     if (!session?.user?.email) return;
     await supabase.from('audit_logs').insert([{
@@ -84,6 +102,7 @@ function App() {
     else setSlaData(data as SLA[]);
   };
 
+  // ... (fetchCoordinates functie blijft hetzelfde)
   const fetchCoordinates = async (address: string, city: string) => {
     try {
       const query = `${address}, ${city}, Belgium`;
@@ -95,7 +114,7 @@ function App() {
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-    try {
+     try {
       const coords = await fetchCoordinates(formData.location, formData.city);
       const mapStatus = formData.isExecuted ? 'active' : 'warning';
       
@@ -111,12 +130,10 @@ function App() {
       if (editingItem) {
         const { error: updateError } = await supabase.from('slas').update(dataToSave).eq('id', editingItem.id);
         error = updateError;
-        // LOG UPDATE
         await logAction('UPDATE', `Dossier bijgewerkt: ${formData.clientName}`);
       } else {
         const { error: insertError } = await supabase.from('slas').insert([dataToSave]);
         error = insertError;
-        // LOG CREATE
         await logAction('CREATE', `Nieuw dossier: ${formData.clientName}`);
       }
 
@@ -137,15 +154,10 @@ function App() {
 
   const handleDeleteSLA = async (idToDelete: string) => {
     try {
-      // Eerst data ophalen voor de log naam (voordat we verwijderen)
       const item = slaData.find(s => s.id === idToDelete);
-      
       const { error } = await supabase.from('slas').delete().eq('id', idToDelete);
       if (error) throw error;
-      
-      // LOG DELETE
       await logAction('DELETE', `Dossier verwijderd: ${item?.clientName || 'Onbekend'}`);
-
       showToast('Dossier verwijderd.', 'success');
       fetchSLAs();
     } catch (error) {
@@ -161,10 +173,7 @@ function App() {
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (error) throw error;
-      
-      // LOG RESET
       await logAction('RESET', 'Jaarreset uitgevoerd (alle statussen gereset)');
-
       await fetchSLAs();
     } catch (error) {
       console.error(error);
@@ -176,7 +185,7 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setSlaData([]);
-    setUserRole('admin'); // Reset naar default
+    setUserRole('admin');
   };
 
   const startEditing = (item: SLA) => { setEditingItem(item); setCurrentView('add'); };
@@ -192,9 +201,27 @@ function App() {
     setCurrentView('list');
   };
 
+  // 1. ANIMATIE SCHERM (Toon dit ALLESBEHALVE als de animatie bezig is)
+  if (showKeyAnimation) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center animate-in fade-in duration-500">
+        <img 
+          src="/key.gif" 
+          alt="Toegang verlenen..." 
+          className="w-64 h-64 object-contain mb-4"
+        />
+        <p className="text-slate-400 text-sm font-medium animate-pulse">Toegang verlenen...</p>
+      </div>
+    );
+  }
+
+  // 2. LADEN
   if (loading && !session) return <div className="min-h-screen flex items-center justify-center text-blue-600">Laden...</div>;
+  
+  // 3. LOGIN SCHERM (Als er geen sessie is)
   if (!session) return <Login />;
 
+  // 4. DE APP (Als er wel sessie is en animatie is klaar)
   return (
     <Shell 
       onLogout={handleLogout} 
@@ -203,7 +230,6 @@ function App() {
     >
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* December Popup (Alleen voor ADMINS nuttig, maar mag iedereen zien) */}
       {showYearEndWarning && userRole === 'admin' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-300 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border-l-8 border-amber-500">
@@ -234,7 +260,7 @@ function App() {
           data={slaData} 
           onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
           onNavigateToList={navigateToList}
-          userRole={userRole} // <--- NIEUW: Geef rol mee aan dashboard
+          userRole={userRole}
         />
       )}
       
@@ -246,7 +272,7 @@ function App() {
           onEdit={startEditing}
           onRefresh={fetchSLAs}
           initialFilter={listFilter}
-          userRole={userRole} // <--- NIEUW: Geef rol mee aan lijst
+          userRole={userRole}
         />
       )}
       
@@ -260,7 +286,7 @@ function App() {
           onBack={() => setCurrentView('home')} 
           onSubmit={handleSaveSLA} 
           initialData={editingItem} 
-          userRole={userRole} // <--- NIEUW: Geef rol mee aan formulier
+          userRole={userRole}
         />
       )}
       
@@ -269,7 +295,7 @@ function App() {
           onBack={() => setCurrentView('home')} 
           onResetYear={handleYearReset}
           data={slaData}
-          userRole={userRole} // <--- NIEUW: Geef rol mee aan settings
+          userRole={userRole}
         />
       )}
     </Shell>
