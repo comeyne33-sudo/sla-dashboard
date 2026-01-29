@@ -1,13 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, Mail, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare, RotateCcw } from 'lucide-react';
-import type { SLA, SLAType, UserRole } from '../../types/sla';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Archive, Hash, ArrowUpFromLine, Maximize, PlayCircle } from 'lucide-react';
+import type { SLA, SLAType, UserRole, SLACategory } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
+import { supabase } from '../../lib/supabase';
 
 type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 const monthNames = [ "", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December" ];
 const BASE_LAT = 50.9904;
 const BASE_LNG = 3.7632;
+
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -17,6 +19,164 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; 
 };
 
+// --- SUB-COMPONENT: EEN ENKELE SLA KAART (ACCORDION) ---
+const SLAItemCard = ({ sla, onEdit, onDelete, onArchive, userRole, onUpdate }: { 
+  sla: SLA; 
+  onEdit: (sla: SLA) => void; 
+  onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
+  userRole: UserRole;
+  onUpdate: () => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const isSalto = sla.category === 'Salto' || !sla.category; // Default Salto
+  const themeColor = isSalto ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100';
+  const borderColor = isSalto ? 'hover:border-blue-300' : 'hover:border-emerald-300';
+
+  return (
+    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all ${borderColor}`}>
+      
+      {/* HEADER (ALTIJD ZICHTBAAR) */}
+      <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
+            {sla.vo_number && (
+              <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Hash size={10} /> {sla.vo_number}
+              </span>
+            )}
+            {sla.isExecuted ? (
+              <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                <CheckCircle size={12} /> Klaar
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                <AlertCircle size={12} /> Open
+              </span>
+            )}
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
+            <span className="flex items-center gap-1"><MapPin size={14} /> {sla.city}</span>
+            
+            {/* Specifieke Tags per categorie */}
+            {isSalto && (
+              <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                sla.type === 'Premium' ? 'bg-purple-100 text-purple-700' : 
+                sla.type === 'Comfort' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {sla.type || 'Basic'}
+              </span>
+            )}
+            {!isSalto && sla.renson_height && (
+              <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                <ArrowUpFromLine size={12} /> {sla.renson_height}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ACTIES & TOGGLE ICON */}
+        <div className="flex items-center gap-2">
+           {/* Technieker Actie Knop (Toekomst) */}
+           {!sla.isExecuted && userRole === 'technician' && (
+             <button onClick={(e) => { e.stopPropagation(); /* TODO: Start Flow */ }} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1">
+               <PlayCircle size={14} /> Uitvoeren
+             </button>
+           )}
+
+           <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="p-2 text-slate-400 hover:text-slate-600">
+             {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+           </button>
+        </div>
+      </div>
+
+      {/* BODY (INKLAPBAAR) */}
+      {expanded && (
+        <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-200">
+          <div className="h-px bg-slate-100 mb-4"></div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm mb-4">
+            
+            {/* KOLOM 1: TECHNISCH */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-slate-400 uppercase">Specificaties</div>
+              
+              {isSalto ? (
+                <>
+                   {sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen materiaal info'}</div>}
+                   <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-emerald-500"/> Installateur: {sla.renson_installer || '-'}</div>
+                  {sla.renson_size && <div className="flex items-center gap-2 text-slate-700"><Maximize size={16} className="text-emerald-500"/> Afmeting: {sla.renson_size}</div>}
+                </>
+              )}
+            </div>
+
+            {/* KOLOM 2: PLANNING & ADRES */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-slate-400 uppercase">Locatie & Planning</div>
+              <div className="flex items-center gap-2 text-slate-700"><MapPin size={16} className="text-slate-400"/> {sla.location}</div>
+              <div className="flex items-center gap-2 text-slate-700"><Calendar size={16} className="text-green-600"/> {monthNames[sla.plannedMonth]}</div>
+              <div className="flex items-center gap-2 text-slate-700"><Euro size={16} className="text-slate-400"/> € {sla.price},-</div>
+            </div>
+
+            {/* KOLOM 3: CONTACT */}
+            <div className="space-y-3">
+              <div className="text-xs font-semibold text-slate-400 uppercase">Contact</div>
+              <div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-slate-400"/> {sla.contactName}</div>
+              <div className="flex items-center gap-2 text-slate-700"><Phone size={16} className="text-slate-400"/> {sla.contactPhone}</div>
+            </div>
+          </div>
+
+          {sla.comments && (
+            <div className="mb-4 text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start">
+              <MessageSquare size={16} className="shrink-0 mt-0.5 text-slate-400" />
+              <span>"{sla.comments}"</span>
+            </div>
+          )}
+
+          {/* FOOTER: BIJLAGEN & KNOPPEN */}
+          <div className="flex flex-wrap justify-between items-center gap-4 pt-4 border-t border-slate-100">
+             <AttachmentManager sla={sla} onUpdate={onUpdate} />
+
+             <div className="flex items-center gap-2">
+                {/* NACALCULATIE KNOP (Alleen als uitgevoerd + Admin) */}
+                {sla.isExecuted && !sla.calculation_done && userRole === 'admin' && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onArchive(sla.id); }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 font-medium text-sm transition-colors border border-indigo-100"
+                    title="Verwijder uit actieve lijst (Nacalculatie OK)"
+                  >
+                    <Archive size={16} /> <span className="hidden sm:inline">Nacalculatie OK</span>
+                  </button>
+                )}
+
+                <button onClick={(e) => { e.stopPropagation(); onEdit(sla); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                  <Pencil size={18} />
+                </button>
+                
+                {userRole === 'admin' && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); if(window.confirm(`Verwijderen?`)) onDelete(sla.id); }}
+                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+             </div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
 interface SLAListProps {
   data: SLA[];
   onBack: () => void;
@@ -29,19 +189,25 @@ interface SLAListProps {
 
 export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilter = 'all', userRole }: SLAListProps) => {
   const [filterStatus, setFilterStatus] = useState<ListFilterType>(initialFilter);
-  const [filterType, setFilterType] = useState<'all' | SLAType>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'month' | 'distance'>('month');
+  const [viewCategory, setViewCategory] = useState<SLACategory>('Salto'); // <--- NIEUW: Toggle State
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (initialFilter) setFilterStatus(initialFilter); }, [initialFilter]);
 
-  // Check of er actieve filters zijn (om de reset knop te tonen/verbergen)
-  const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || searchQuery !== '';
-
-  const resetFilters = () => {
-    setSearchQuery('');
-    setFilterStatus('all');
-    setFilterType('all');
+  // Archiveer functie (Zet calculation_done op TRUE)
+  const handleArchive = async (id: string) => {
+    if(!window.confirm("Wil je deze SLA archiveren? Hij verdwijnt uit de nacalculatie-lijst.")) return;
+    
+    const { error } = await supabase
+      .from('slas')
+      .update({ calculation_done: true })
+      .eq('id', id);
+    
+    if (!error) {
+      onRefresh(); // Data opnieuw ophalen
+    } else {
+      alert("Fout bij archiveren.");
+    }
   };
 
   const processedData = useMemo(() => {
@@ -53,26 +219,32 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
     if (nextMonth > 12) nextMonth -= 12;
     if (monthAfter > 12) monthAfter -= 12;
 
+    // 1. EERST FILTEREN OP CATEGORIE (TOGGLE)
+    result = result.filter(s => (s.category === viewCategory) || (!s.category && viewCategory === 'Salto'));
+
+    // 2. FILTER OP NACALCULATIE (Verberg gearchiveerde items, tenzij we specifiek zoeken ofzo, maar laten we ze standaard verbergen)
+    // We tonen ze ALLEEN als calculation_done FALSE is. 
+    result = result.filter(s => !s.calculation_done);
+
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(s => s.clientName.toLowerCase().includes(lowerQuery) || s.city.toLowerCase().includes(lowerQuery) || s.location.toLowerCase().includes(lowerQuery));
     }
+
     if (filterStatus === 'critical') result = result.filter(s => !s.isExecuted && s.plannedMonth <= currentMonth);
     else if (filterStatus === 'planning') result = result.filter(s => !s.isExecuted && (s.plannedMonth === nextMonth || s.plannedMonth === monthAfter));
     else if (filterStatus === 'done') result = result.filter(s => s.isExecuted);
-    if (filterType !== 'all') result = result.filter(s => s.type === filterType);
 
-    result.sort((a, b) => {
-      if (sortBy === 'name') return a.clientName.localeCompare(b.clientName);
-      if (sortBy === 'month') return a.plannedMonth - b.plannedMonth;
-      if (sortBy === 'distance') return calculateDistance(BASE_LAT, BASE_LNG, a.lat, a.lng) - calculateDistance(BASE_LAT, BASE_LNG, b.lat, b.lng);
-      return 0;
-    });
+    // Sorteren (Standaard op Maand)
+    result.sort((a, b) => a.plannedMonth - b.plannedMonth);
+
     return result;
-  }, [data, filterStatus, filterType, sortBy, searchQuery]);
+  }, [data, filterStatus, viewCategory, searchQuery]);
 
   return (
     <div className="space-y-6">
+       
+       {/* HEADER MET TERUG KNOP & TITEL */}
        <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
@@ -81,132 +253,76 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, initialFilt
           <h2 className="text-2xl font-bold text-slate-900">
              {filterStatus === 'critical' ? 'Kritieke Dossiers' : 
              filterStatus === 'planning' ? 'Planning' :
-             filterStatus === 'done' ? 'Uitgevoerde Dossiers' : 
+             filterStatus === 'done' ? 'Nacalculatie / Uitgevoerd' : 
              'Alle Dossiers'} 
              <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span>
           </h2>
-          <p className="text-slate-500">Beheer filters en sortering hieronder.</p>
         </div>
       </div>
 
+      {/* --- NIEUWE TOGGLE BALK --- */}
+      <div className="flex bg-slate-100 p-1 rounded-xl">
+        <button 
+          onClick={() => setViewCategory('Salto')}
+          className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            viewCategory === 'Salto' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          SALTO
+        </button>
+        <button 
+          onClick={() => setViewCategory('Renson')}
+          className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            viewCategory === 'Renson' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          RENSON
+        </button>
+      </div>
+
+      {/* FILTER & ZOEK BALK */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        {/* BOVENBALK MET ZOEK EN RESET */}
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={18} className="text-slate-400" /></div>
-            <input type="text" placeholder="Zoek op klantnaam, stad of straat..." className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <input type="text" placeholder="Zoek op klant, stad..." className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
           
-          {/* NIEUWE RESET KNOP (Alleen zichtbaar als er filters zijn) */}
-          {hasActiveFilters && (
-            <button 
-              onClick={resetFilters}
-              className="px-4 py-2 bg-slate-100 text-slate-600 font-medium rounded-lg hover:bg-slate-200 hover:text-slate-800 transition-colors flex items-center gap-2 whitespace-nowrap"
-              title="Alles tonen"
-            >
-              <RotateCcw size={16} />
-              <span className="hidden sm:inline">Reset Filters</span>
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-           <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><Filter size={12} /> Status</label>
-            <select className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
-              <option value="all">Alles Tonen</option>
-              <option value="critical">Kritiek (Te laat/Nu)</option>
-              <option value="planning">In Planning (Next 2 mnd)</option>
-              <option value="done">Reeds uitgevoerd</option>
+          <div className="flex gap-2">
+            <select className="p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 min-w-[150px]" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
+              <option value="all">Alles</option>
+              <option value="critical">Kritiek</option>
+              <option value="planning">Planning</option>
+              <option value="done">Uitgevoerd</option>
             </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><Filter size={12} /> Type</label>
-            <select className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50" value={filterType} onChange={(e) => setFilterType(e.target.value as any)}>
-              <option value="all">Alle Types</option>
-              <option value="Basic">Basic</option>
-              <option value="Comfort">Comfort</option>
-              <option value="Premium">Premium</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase mb-1 flex items-center gap-1"><SortAsc size={12} /> Sorteren</label>
-            <select className="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
-              <option value="month">Maand</option>
-              <option value="name">Naam</option>
-              <option value="distance">Afstand</option>
-            </select>
+            
+            {(searchQuery || filterStatus !== 'all') && (
+              <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg" title="Reset">
+                <RotateCcw size={18} />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
+      {/* LIJST MET KAARTEN */}
       <div className="grid gap-4">
         {processedData.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
-            <p className="text-slate-500 font-medium">Geen dossiers gevonden.</p>
-            <button onClick={resetFilters} className="mt-2 text-blue-600 text-sm hover:underline">
-              Filters wissen
-            </button>
+            <p className="text-slate-500 font-medium">Geen dossiers gevonden in {viewCategory}.</p>
           </div>
         )}
 
         {processedData.map((sla) => (
-          <div key={sla.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:border-blue-300 transition-all relative">
-            <div className="absolute top-6 right-6 flex gap-2 items-center">
-               <AttachmentManager sla={sla} onUpdate={onRefresh} />
-               <button onClick={() => onEdit(sla)} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors border border-blue-100">
-                <Pencil size={18} />
-              </button>
-              {userRole === 'admin' && (
-                <button 
-                  onClick={() => { if(window.confirm(`Verwijderen?`)) onDelete(sla.id); }}
-                  className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors border border-red-100"
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
-            </div>
-
-            <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4 pr-32">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  {sla.clientName}
-                  {sla.isExecuted ? <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><CheckCircle size={12} /> Uitgevoerd</span> : <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><AlertCircle size={12} /> Te doen</span>}
-                </h3>
-                <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm mt-1">
-                  <span className="flex items-center gap-1"><MapPin size={14} /> {sla.location}, {sla.city}</span>
-                </div>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide hidden sm:inline-block ${sla.type === 'Premium' ? 'bg-purple-100 text-purple-700' : sla.type === 'Comfort' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{sla.type}</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-               <div className="space-y-3">
-                <div className="text-xs font-semibold text-slate-400 uppercase">Materiaal & Tijd</div>
-                {sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen specifiek materiaal'}</div>}
-                <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div>
-              </div>
-              <div className="space-y-3">
-                <div className="text-xs font-semibold text-slate-400 uppercase">Planning</div>
-                <div className="flex items-center gap-2 text-slate-700"><Calendar size={16} className="text-green-600"/> Uitvoering: {monthNames[sla.plannedMonth] || 'Onbekend'}</div>
-                <div className="flex items-center gap-2 text-slate-700"><Euro size={16} className="text-slate-400"/> € {sla.price},-</div>
-              </div>
-              <div className="space-y-3">
-                <div className="text-xs font-semibold text-slate-400 uppercase">Contact</div>
-                <div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-slate-400"/> {sla.contactName}</div>
-                <div className="flex items-center gap-2 text-slate-700"><Phone size={16} className="text-slate-400"/> {sla.contactPhone}</div>
-              </div>
-            </div>
-
-            {sla.comments && (
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                 <div className="text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start">
-                    <MessageSquare size={16} className="shrink-0 mt-0.5 text-slate-400" />
-                    <span>"{sla.comments}"</span>
-                  </div>
-              </div>
-            )}
-          </div>
+          <SLAItemCard 
+            key={sla.id} 
+            sla={sla} 
+            onEdit={onEdit} 
+            onDelete={onDelete} 
+            onArchive={handleArchive}
+            userRole={userRole}
+            onUpdate={onRefresh}
+          />
         ))}
       </div>
     </div>
