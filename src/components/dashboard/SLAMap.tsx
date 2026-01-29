@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import 'leaflet/dist/leaflet.css'; // <--- Zorg dat deze import er zeker staat!
 import L from 'leaflet';
 import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import type { SLA, SLACategory } from '../../types/sla';
@@ -67,6 +67,7 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   const [showExecuted, setShowExecuted] = useState(false);
 
   const safeData = data || [];
+  // Centrum van België
   const belgiumCenter: [number, number] = [50.8503, 4.3517];
 
   const filteredData = useMemo(() => {
@@ -82,7 +83,9 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   }, [safeData, viewCategory, showExecuted]);
 
   return (
-    <div className="flex flex-col space-y-4 h-full relative">
+    <div className="flex flex-col space-y-4 h-full relative pb-10">
+      
+      {/* HEADER & CONTROLS */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -133,16 +136,19 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
         </div>
       </div>
 
+      {/* DE KAART CONTAINER - DE FIX ZIT HIER */}
+      {/* We geven de div een harde hoogte (h-[600px]) en de map container ook height: 100% */}
       <div 
-        className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0 flex-1 min-h-[500px]"
+        className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0 w-full h-[600px] bg-slate-100"
       >
         <MapContainer 
           center={belgiumCenter} 
-          zoom={9} 
-          style={{ height: '100%', width: '100%' }}
+          zoom={8} 
+          scrollWheelZoom={true}
+          style={{ height: '100%', width: '100%', minHeight: '600px' }} // Dubbele zekerheid voor hoogte
         >
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
@@ -150,6 +156,9 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
             const status = getMarkerStatus(sla);
             const category = sla.category || 'Salto';
             
+            // Veiligheid: check of coordinaten bestaan
+            if (!sla.lat || !sla.lng) return null;
+
             return (
               <Marker 
                 key={sla.id} 
