@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, User } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, User, Archive, CheckSquare, Hash } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { SLA, UserRole, AuditLog, UserProfile } from '../types/sla';
 
@@ -26,14 +26,20 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   const [displayName, setDisplayName] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
 
+  // Nacalculatie state
+  const [recalcList, setRecalcList] = useState<SLA[]>([]);
+
   useEffect(() => {
     if (userProfile?.display_name) {
       setDisplayName(userProfile.display_name);
     }
     if (userRole === 'admin') {
       fetchLogs();
+      // Filter dossiers die uitgevoerd zijn maar nog geen nacalculatie hebben
+      const toRecalc = data.filter(s => s.isExecuted && !s.calculation_done);
+      setRecalcList(toRecalc);
     }
-  }, [userRole, userProfile]);
+  }, [userRole, userProfile, data]);
 
   const fetchLogs = async () => {
     const { data } = await supabase
@@ -69,6 +75,24 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     setProfileSaving(false);
   };
 
+  const handleRecalcDone = async (id: string) => {
+    if (!confirm('Markeren als financieel afgehandeld?')) return;
+
+    const { error } = await supabase
+      .from('slas')
+      .update({ calculation_done: true })
+      .eq('id', id);
+
+    if (!error) {
+      // Update lokale lijst direct voor snelle feedback
+      setRecalcList(prev => prev.filter(item => item.id !== id));
+      // Trigger update in main app (via onProfileUpdate als hack, of eigenlijk moet App data refreshen)
+      onProfileUpdate(); 
+    } else {
+      alert('Fout bij updaten.');
+    }
+  };
+
   const handleResetClick = async () => {
     if (confirm("⚠️ LET OP: Weet je het zeker?\n\nHiermee zet je ALLE contracten terug op 'Niet Uitgevoerd'.\nDoe dit alleen aan het begin van het nieuwe jaar!")) {
       if (confirm("Echt zeker? Dit kan niet ongedaan worden gemaakt.")) {
@@ -81,7 +105,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   };
 
   const handleExport = () => {
-    const headers = ['Categorie', 'Klant', 'Stad', 'Adres', 'Type/Details', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?'];
+    const headers = ['Categorie', 'Klant', 'Stad', 'Adres', 'Type/Details', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?', 'Nacalculatie OK?'];
     
     const csvContent = [
       headers.join(';'), 
@@ -94,7 +118,8 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         item.status,
         item.price,
         item.plannedMonth,
-        item.isExecuted ? 'JA' : 'NEE'
+        item.isExecuted ? 'JA' : 'NEE',
+        item.calculation_done ? 'JA' : 'NEE'
       ].join(';'))
     ].join('\n');
 
@@ -188,6 +213,45 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
       {/* ADMIN SECTIES */}
       {userRole === 'admin' && (
         <>
+          {/* NIEUW: OPENSTAANDE NACALCULATIES */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Archive size={20} className="text-purple-600" /> Openstaande Nacalculaties
+              </h3>
+              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold">
+                {recalcList.length} te doen
+              </span>
+            </div>
+            
+            {recalcList.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">
+                <CheckSquare size={32} className="mx-auto mb-2 text-slate-300" />
+                <p>Geen openstaande nacalculaties. Alles is bijgewerkt!</p>
+              </div>
+            ) : (
+              <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
+                {recalcList.map(item => (
+                  <div key={item.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                    <div>
+                      <p className="font-bold text-slate-900">{item.clientName}</p>
+                      <div className="flex gap-3 text-xs text-slate-500">
+                        <span>{item.city}</span>
+                        {item.vo_number && <span className="flex items-center gap-1"><Hash size={10} /> {item.vo_number}</span>}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handleRecalcDone(item.id)}
+                      className="px-3 py-1.5 bg-white border border-purple-200 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
+                    >
+                      Markeer Afgehandeld
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* EXPORT */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
              <div className="p-6 border-b border-slate-100">

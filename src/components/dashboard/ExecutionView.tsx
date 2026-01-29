@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Save, Loader2, MapPin, Hash } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Save, Loader2, MapPin, Hash, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { SLA, DoorItem } from '../../types/sla';
+import { AttachmentManager } from './AttachmentManager';
 
 interface ExecutionViewProps {
   sla: SLA;
@@ -14,6 +15,9 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generalComments, setGeneralComments] = useState(sla.comments || '');
+  
+  // Trigger voor updates (foto's)
+  const [, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     fetchDoors();
@@ -51,12 +55,10 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
     setSaving(true);
 
     try {
-      // 1. Update deuren
       if (doors.length > 0) {
         await supabase.from('sla_doors').upsert(doors);
       }
 
-      // 2. Update SLA
       await supabase.from('slas').update({
         isExecuted: true,
         comments: generalComments,
@@ -76,7 +78,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
 
   return (
     <div className="max-w-3xl mx-auto pb-20">
-      {/* HEADER */}
       <div className="bg-white p-4 sticky top-0 z-10 border-b border-slate-200 shadow-sm mb-6">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full">
@@ -145,24 +146,26 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
                <CheckCircle size={32} />
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-2">Algemene Uitvoering</h3>
-            <p className="text-slate-500">Er is geen specifieke checklist voor dit dossier. <br/> Voer de werkzaamheden uit en noteer je bevindingen hieronder.</p>
+            <p className="text-slate-500">Er is geen specifieke checklist voor dit dossier.</p>
           </div>
         )}
 
-        {/* ALGEMENE OPMERKINGEN */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h3 className="font-bold text-slate-900 mb-2">Eindverslag / Opmerkingen</h3>
+        {/* FOTO & OPMERKINGEN */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+             <h3 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare size={20} /> Eindverslag & Foto's</h3>
+             <AttachmentManager sla={sla} onUpdate={() => setUpdateTrigger(n => n + 1)} />
+          </div>
           <textarea 
             className="w-full p-3 border border-slate-300 rounded-lg min-h-[120px]" 
-            placeholder="Beschrijf wat je gedaan hebt..."
-            value={generalComments}
-            onChange={e => setGeneralComments(e.target.value)}
+            placeholder="Beschrijf wat je gedaan hebt..." 
+            value={generalComments} 
+            onChange={e => setGeneralComments(e.target.value)} 
           />
         </div>
 
       </div>
 
-      {/* FOOTER */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg z-20">
          <div className="max-w-3xl mx-auto">
             <button 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css'; // <--- Zorg dat deze import er zeker staat!
+import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { ArrowLeft, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import type { SLA, SLACategory } from '../../types/sla';
@@ -64,11 +64,12 @@ interface SLAMapProps {
 
 export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   const [viewCategory, setViewCategory] = useState<'All' | SLACategory>('All');
-  const [showExecuted, setShowExecuted] = useState(false);
+  const [showExecuted, setShowExecuted] = useState(true); // Standaard aan
 
   const safeData = data || [];
-  // Centrum van België
-  const belgiumCenter: [number, number] = [50.8503, 4.3517];
+  
+  // Vlaanderen Focus (Ongeveer Aalst)
+  const vlaanderenCenter: [number, number] = [51.00, 4.20]; 
 
   const filteredData = useMemo(() => {
     return safeData.filter(sla => {
@@ -77,7 +78,6 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
         if (cat !== viewCategory) return false;
       }
       if (!showExecuted && sla.isExecuted) return false;
-      if (sla.calculation_done) return false;
       return true;
     });
   }, [safeData, viewCategory, showExecuted]);
@@ -85,7 +85,6 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
   return (
     <div className="flex flex-col space-y-4 h-full relative pb-10">
       
-      {/* HEADER & CONTROLS */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -94,7 +93,7 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
           <div>
             <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
               <MapPin className="text-emerald-600" />
-              Locatie Overzicht
+              Kaart Vlaanderen
             </h2>
             <p className="text-slate-500 text-sm">
               {filteredData.length} locaties zichtbaar
@@ -131,21 +130,19 @@ export const SLAMap = ({ data, onBack, onViewSLA }: SLAMapProps) => {
               checked={showExecuted}
               onChange={e => setShowExecuted(e.target.checked)}
             />
-            <span className="text-sm font-medium text-slate-700">Toon ook uitgevoerd</span>
+            <span className="text-sm font-medium text-slate-700">Toon uitgevoerd</span>
           </label>
         </div>
       </div>
 
-      {/* DE KAART CONTAINER - DE FIX ZIT HIER */}
-      {/* We geven de div een harde hoogte (h-[600px]) en de map container ook height: 100% */}
       <div 
         className="rounded-xl overflow-hidden border border-slate-300 shadow-inner relative z-0 w-full h-[600px] bg-slate-100"
       >
         <MapContainer 
-          center={belgiumCenter} 
-          zoom={8} 
+          center={vlaanderenCenter} 
+          zoom={9} 
           scrollWheelZoom={true}
-          style={{ height: '100%', width: '100%', minHeight: '600px' }} // Dubbele zekerheid voor hoogte
+          style={{ height: '100%', width: '100%', minHeight: '600px' }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Filter, SortAsc, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Archive, Hash, ArrowUpFromLine, Maximize, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Hash, ArrowUpFromLine, Maximize, PlayCircle, CheckCircle2 } from 'lucide-react';
 import type { SLA, SLAType, UserRole, SLACategory } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
 import { supabase } from '../../lib/supabase';
@@ -7,18 +7,16 @@ import { supabase } from '../../lib/supabase';
 type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 const monthNames = [ "", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December" ];
 
-const SLAItemCard = ({ sla, onEdit, onDelete, onArchive, userRole, onUpdate, onExecute }: { 
+const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: { 
   sla: SLA; 
   onEdit: (sla: SLA) => void; 
   onDelete: (id: string) => void;
-  onArchive: (id: string) => void;
   onExecute: (sla: SLA) => void;
   userRole: UserRole;
   onUpdate: () => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const isSalto = sla.category === 'Salto' || !sla.category;
-  const themeColor = isSalto ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100';
   const borderColor = isSalto ? 'hover:border-blue-300' : 'hover:border-emerald-300';
 
   return (
@@ -28,7 +26,13 @@ const SLAItemCard = ({ sla, onEdit, onDelete, onArchive, userRole, onUpdate, onE
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
             {sla.vo_number && <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1"><Hash size={10} /> {sla.vo_number}</span>}
-            {sla.isExecuted ? <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><CheckCircle size={12} /> Klaar</span> : <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><AlertCircle size={12} /> Open</span>}
+            {sla.isExecuted ? (
+              sla.calculation_done ? (
+                <span className="flex items-center gap-1 text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full" title="Financieel afgerond"><CheckCircle2 size={12} /> Nacalculatie OK</span>
+              ) : (
+                 <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><CheckCircle size={12} /> Uitgevoerd</span>
+              )
+            ) : <span className="flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><AlertCircle size={12} /> Open</span>}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
             <span className="flex items-center gap-1"><MapPin size={14} /> {sla.city}</span>
@@ -50,15 +54,9 @@ const SLAItemCard = ({ sla, onEdit, onDelete, onArchive, userRole, onUpdate, onE
             <div className="space-y-3">
               <div className="text-xs font-semibold text-slate-400 uppercase">Specificaties</div>
               {isSalto ? (
-                <>
-                   {sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen materiaal info'}</div>}
-                   <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div>
-                </>
+                <>{sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen materiaal info'}</div>}<div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div></>
               ) : (
-                <>
-                  <div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-emerald-500"/> Installateur: {sla.renson_installer || '-'}</div>
-                  {sla.renson_size && <div className="flex items-center gap-2 text-slate-700"><Maximize size={16} className="text-emerald-500"/> Afmeting: {sla.renson_size}</div>}
-                </>
+                <><div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-emerald-500"/> Installateur: {sla.renson_installer || '-'}</div>{sla.renson_size && <div className="flex items-center gap-2 text-slate-700"><Maximize size={16} className="text-emerald-500"/> Afmeting: {sla.renson_size}</div>}</>
               )}
             </div>
             <div className="space-y-3">
@@ -73,15 +71,11 @@ const SLAItemCard = ({ sla, onEdit, onDelete, onArchive, userRole, onUpdate, onE
               <div className="flex items-center gap-2 text-slate-700"><Phone size={16} className="text-slate-400"/> {sla.contactPhone}</div>
             </div>
           </div>
-          {sla.comments && (
-            <div className="mb-4 text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start"><MessageSquare size={16} className="shrink-0 mt-0.5 text-slate-400" /><span>"{sla.comments}"</span></div>
+          {sla.comments && (<div className="mb-4 text-sm bg-slate-50 p-3 rounded-lg text-slate-600 italic border border-slate-100 flex gap-2 items-start"><MessageSquare size={16} className="shrink-0 mt-0.5 text-slate-400" /><span>"{sla.comments}"</span></div>
           )}
           <div className="flex flex-wrap justify-between items-center gap-4 pt-4 border-t border-slate-100">
              <AttachmentManager sla={sla} onUpdate={onUpdate} />
              <div className="flex items-center gap-2">
-                {sla.isExecuted && !sla.calculation_done && userRole === 'admin' && (
-                  <button onClick={(e) => { e.stopPropagation(); onArchive(sla.id); }} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 font-medium text-sm transition-colors border border-indigo-100"><Archive size={16} /> <span className="hidden sm:inline">Nacalculatie OK</span></button>
-                )}
                 <button onClick={(e) => { e.stopPropagation(); onEdit(sla); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"><Pencil size={18} /></button>
                 {userRole === 'admin' && <button onClick={(e) => { e.stopPropagation(); if(window.confirm(`Verwijderen?`)) onDelete(sla.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"><Trash2 size={18} /></button>}
              </div>
@@ -110,23 +104,16 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
 
   useEffect(() => { if (initialFilter) setFilterStatus(initialFilter); }, [initialFilter]);
 
-  const handleArchive = async (id: string) => {
-    if(!window.confirm("Wil je deze SLA archiveren? Hij verdwijnt uit de nacalculatie-lijst.")) return;
-    const { error } = await supabase.from('slas').update({ calculation_done: true }).eq('id', id);
-    if (!error) onRefresh(); else alert("Fout bij archiveren.");
-  };
-
   const processedData = useMemo(() => {
     let result = [...data];
     const today = new Date();
     const currentMonth = today.getMonth() + 1;
-    let nextMonth = currentMonth + 1;
-    let monthAfter = currentMonth + 2;
-    if (nextMonth > 12) nextMonth -= 12;
-    if (monthAfter > 12) monthAfter -= 12;
+    let nextMonth = currentMonth + 1; let monthAfter = currentMonth + 2;
+    if (nextMonth > 12) nextMonth -= 12; if (monthAfter > 12) monthAfter -= 12;
 
     result = result.filter(s => (s.category === viewCategory) || (!s.category && viewCategory === 'Salto'));
-    result = result.filter(s => !s.calculation_done);
+    
+    // ALLE items blijven zichtbaar
 
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -145,7 +132,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
     <div className="space-y-6">
        <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><ArrowLeft size={24} className="text-slate-600" /></button>
-        <div><h2 className="text-2xl font-bold text-slate-900">{filterStatus === 'critical' ? 'Kritieke Dossiers' : filterStatus === 'planning' ? 'Planning' : filterStatus === 'done' ? 'Nacalculatie / Uitgevoerd' : 'Alle Dossiers'} <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span></h2></div>
+        <div><h2 className="text-2xl font-bold text-slate-900">{filterStatus === 'critical' ? 'Kritieke Dossiers' : filterStatus === 'planning' ? 'Planning' : filterStatus === 'done' ? 'Uitgevoerd / Nacalculatie' : 'Alle Dossiers'} <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span></h2></div>
       </div>
 
       <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -165,7 +152,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
 
       <div className="grid gap-4">
         {processedData.length === 0 && <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed"><p className="text-slate-500 font-medium">Geen dossiers gevonden in {viewCategory}.</p></div>}
-        {processedData.map((sla) => <SLAItemCard key={sla.id} sla={sla} onEdit={onEdit} onDelete={onDelete} onArchive={handleArchive} userRole={userRole} onUpdate={onRefresh} onExecute={onExecute} />)}
+        {processedData.map((sla) => <SLAItemCard key={sla.id} sla={sla} onEdit={onEdit} onDelete={onDelete} userRole={userRole} onUpdate={onRefresh} onExecute={onExecute} />)}
       </div>
     </div>
   );
