@@ -1,7 +1,7 @@
-export type SLAType = 'Basic' | 'Comfort' | 'Premium'; // Enkel voor Salto
+export type SLAType = 'Basic' | 'Comfort' | 'Premium';
 export type SLAStatus = 'active' | 'warning' | 'critical'; 
 export type UserRole = 'admin' | 'technician';
-export type SLACategory = 'Salto' | 'Renson'; // <--- NIEUW
+export type SLACategory = 'Salto' | 'Renson';
 
 export interface Attachment {
   name: string;
@@ -17,7 +17,6 @@ export interface AuditLog {
   created_at: string;
 }
 
-// NIEUW: Voor de Salto deurenlijst
 export interface DoorItem {
   id: string;
   sla_id: string;
@@ -26,10 +25,16 @@ export interface DoorItem {
   remarks: string;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
 export interface SLA {
   id: string;
   // GEMEENSCHAPPELIJK
-  category: SLACategory; // Salto of Renson
+  category: SLACategory;
   clientName: string;
   location: string;
   city: string;
@@ -45,23 +50,16 @@ export interface SLA {
   lastUpdate: string;
   isExecuted: boolean;
   plannedMonth: number;
-  vo_number?: string;        // Nieuw: ERP nummer
-  calculation_done: boolean; // Nieuw: Voor nacalculatie lijst
+  vo_number?: string;
+  calculation_done: boolean;
 
   // SALTO SPECIFIEK
-  type?: SLAType;            // Basic/Comfort/Premium (Niet voor Renson)
-  partsNeeded?: string;      // Materiaal (Vooral Salto?)
-  hoursRequired?: number;    // Uren
+  type?: SLAType;
+  partsNeeded?: string;
+  hoursRequired?: number;
 
   // RENSON SPECIFIEK
-  renson_height?: string;    // Gelijkvloers, +1, ...
-  renson_installer?: string; // Naam installateur
-  renson_size?: string;      // Afmeting
-}
-
-// NIEUW: Profiel voor de begroeting
-export interface UserProfile {
-  id: string;
-  email: string;
-  display_name: string;
+  renson_height?: string;
+  renson_installer?: string;
+  renson_size?: string;
 }

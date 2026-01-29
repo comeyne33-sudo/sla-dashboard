@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2, Hash, ArrowUpFromLine, User } from 'lucide-react';
-import type { SLA, SLAType, Attachment, UserRole, SLACategory } from '../../types/sla';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2, Hash, ArrowUpFromLine, User, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import type { SLA, SLAType, Attachment, UserRole, SLACategory, DoorItem } from '../../types/sla';
 import { supabase } from '../../lib/supabase';
 
 interface SLAFormProps {
@@ -43,6 +43,18 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
   });
 
   const [uploading, setUploading] = useState(false);
+  const [doors, setDoors] = useState<DoorItem[]>([]);
+  const [importingDoors, setImportingDoors] = useState(false);
+
+  useEffect(() => {
+    if (initialData?.id) fetchDoors();
+  }, [initialData]);
+
+  const fetchDoors = async () => {
+    if (!initialData?.id) return;
+    const { data } = await supabase.from('sla_doors').select('*').eq('sla_id', initialData.id).order('created_at', { ascending: true });
+    if (data) setDoors(data as DoorItem[]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +82,60 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
 
   const removeAttachment = (indexToRemove: number) => {
     setFormData(prev => ({ ...prev, attachments: prev.attachments.filter((_, index) => index !== indexToRemove) }));
+  };
+
+  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !initialData?.id) {
+        alert("Sla het dossier eerst op voordat je deuren importeert.");
+        return;
+    }
+    
+    setImportingDoors(true);
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split('\n');
+      const newDoors = lines
+        .map(line => line.split(/[;,]/)[0]?.trim())
+        .filter(name => name && name.length > 0 && name.toLowerCase() !== 'naam' && name.toLowerCase() !== 'name');
+
+      if (newDoors.length === 0) {
+        alert("Geen geldige deuren gevonden in CSV.");
+        setImportingDoors(false);
+        return;
+      }
+
+      const insertData = newDoors.map(name => ({
+        sla_id: initialData.id,
+        door_name: name,
+        status: 'pending'
+      }));
+
+      const { error } = await supabase.from('sla_doors').insert(insertData);
+      
+      if (error) {
+        console.error(error);
+        alert("Fout bij importeren database.");
+      } else {
+        alert(`${newDoors.length} deuren succesvol geïmporteerd!`);
+        fetchDoors();
+      }
+      setImportingDoors(false);
+    };
+
+    reader.readAsText(file);
+  };
+
+  const handleDeleteAllDoors = async () => {
+    if(!initialData?.id) return;
+    if(!confirm("Ben je zeker? Dit verwijdert alle geïmporteerde deuren.")) return;
+    
+    await supabase.from('sla_doors').delete().eq('sla_id', initialData.id);
+    fetchDoors();
   };
 
   const months = [
@@ -100,7 +166,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
           <div className="grid grid-cols-2">
             <button
               type="button"
-              disabled={isTechnician}
+              disabled={isTechnician || !!initialData}
               onClick={() => setFormData({...formData, category: 'Salto'})}
               className={`p-4 text-center font-bold transition-colors ${
                 formData.category === 'Salto' 
@@ -112,7 +178,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             </button>
             <button
               type="button"
-              disabled={isTechnician}
+              disabled={isTechnician || !!initialData}
               onClick={() => setFormData({...formData, category: 'Renson'})}
               className={`p-4 text-center font-bold transition-colors ${
                 formData.category === 'Renson' 
@@ -153,11 +219,10 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                 <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
               </div>
               <div>
-                {/* FIX: 'block' verwijderd, 'flex' behouden */}
                 <label className="text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
-                   <Hash size={14} /> VO Nummer (Optioneel)
+                   <Hash size={14} /> VO Nummer
                 </label>
-                <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" placeholder="bv. VO-2024-..." value={formData.vo_number} onChange={e => setFormData({...formData, vo_number: e.target.value})} />
+                <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.vo_number} onChange={e => setFormData({...formData, vo_number: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>
@@ -221,6 +286,42 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                   <label className="block text-sm font-medium text-blue-900 mb-1">Geschatte Uren</label>
                   <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-blue-200 rounded-lg" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
                 </div>
+                
+                {/* --- CSV DEURLIJST IMPORT --- */}
+                {initialData && !isTechnician && (
+                  <div className="md:col-span-2 mt-4 pt-4 border-t border-blue-200">
+                    <label className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                       <FileSpreadsheet size={18} /> Deurlijst (CSV Import)
+                    </label>
+                    
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
+                      {doors.length > 0 ? (
+                        <div className="space-y-3">
+                           <div className="flex items-center justify-between">
+                             <p className="text-green-600 font-medium flex items-center gap-2">
+                               <CheckSquare size={18} /> {doors.length} deuren geïmporteerd
+                             </p>
+                             <button type="button" onClick={handleDeleteAllDoors} className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1">
+                               <Trash2 size={14} /> Verwijder lijst
+                             </button>
+                           </div>
+                           <div className="max-h-32 overflow-y-auto bg-slate-50 p-2 rounded border border-slate-100 text-sm text-slate-600">
+                              {doors.map((d, i) => <div key={i} className="truncate">{i+1}. {d.door_name}</div>)}
+                           </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                           <p className="text-sm text-slate-500 mb-3">Upload een .csv bestand (1e kolom = naam)</p>
+                           <label className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg cursor-pointer hover:bg-blue-200 transition-colors ${importingDoors ? 'opacity-50' : ''}`}>
+                             {importingDoors ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                             <span>CSV Selecteren</span>
+                             <input type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
+                           </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -228,14 +329,12 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             {formData.category === 'Renson' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  {/* FIX: 'block' verwijderd, 'flex' behouden */}
                   <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
                     <User size={14} /> Installateur
                   </label>
                   <input type="text" disabled={isTechnician} className="w-full p-2 border border-emerald-200 rounded-lg" placeholder="bv. Ramen & Deuren BV" value={formData.renson_installer} onChange={e => setFormData({...formData, renson_installer: e.target.value})} />
                 </div>
                 <div>
-                  {/* FIX: 'block' verwijderd, 'flex' behouden */}
                   <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
                      <ArrowUpFromLine size={14} /> Hoogte (Verdiep)
                   </label>

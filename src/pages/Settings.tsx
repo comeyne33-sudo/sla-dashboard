@@ -8,8 +8,8 @@ interface SettingsProps {
   onResetYear: () => Promise<void>;
   data: SLA[];
   userRole: UserRole;
-  userProfile: UserProfile | null; // <--- NIEUW: Huidig profiel
-  onProfileUpdate: () => void;     // <--- NIEUW: Trigger om App te updaten
+  userProfile: UserProfile | null;
+  onProfileUpdate: () => void;
 }
 
 export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onProfileUpdate }: SettingsProps) => {
@@ -22,16 +22,14 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
 
-  // Profiel state (Naam)
+  // Profiel state
   const [displayName, setDisplayName] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
-    // Vul naam in als die er al is
     if (userProfile?.display_name) {
       setDisplayName(userProfile.display_name);
     }
-    
     if (userRole === 'admin') {
       fetchLogs();
     }
@@ -43,6 +41,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
+    
     if (data) setAuditLogs(data as AuditLog[]);
   };
 
@@ -51,7 +50,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Upsert: Maak aan als niet bestaat, anders update
       const { error } = await supabase
         .from('profiles')
         .upsert({ 
@@ -61,7 +59,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         });
       
       if (!error) {
-        onProfileUpdate(); // Vertel App.tsx dat er een nieuwe naam is
+        onProfileUpdate();
         alert('Naam opgeslagen!');
       } else {
         console.error(error);
@@ -84,14 +82,15 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
 
   const handleExport = () => {
     const headers = ['Categorie', 'Klant', 'Stad', 'Adres', 'Type/Details', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?'];
+    
     const csvContent = [
       headers.join(';'), 
       ...data.map(item => [
-        item.category, // <--- NIEUW: Categorie in export
+        item.category,
         `"${item.clientName}"`,
         `"${item.city}"`,
         `"${item.location}"`,
-        item.category === 'Salto' ? item.type : item.renson_height, // <--- Dynamisch veld
+        item.category === 'Salto' ? item.type : item.renson_height,
         item.status,
         item.price,
         item.plannedMonth,
@@ -116,8 +115,10 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     setPwLoading(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setPwLoading(false);
-    if (error) setPwMessage('Fout: ' + error.message);
-    else {
+
+    if (error) {
+      setPwMessage('Fout: ' + error.message);
+    } else {
       setPwMessage('Succes! Je wachtwoord is gewijzigd.');
       setNewPassword('');
     }
@@ -130,7 +131,9 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
           <CheckCircle size={32} />
         </div>
         <h2 className="text-2xl font-bold text-green-800">Jaarreset Voltooid!</h2>
-        <button onClick={onBack} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Terug naar Dashboard</button>
+        <button onClick={onBack} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+          Terug naar Dashboard
+        </button>
       </div>
     );
   }
@@ -144,13 +147,12 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         <h2 className="text-2xl font-bold text-slate-900">Instellingen & Beheer</h2>
       </div>
 
-      {/* BLOK 1: MIJN PROFIEL (NIEUW) */}
+      {/* MIJN PROFIEL */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <User size={20} className="text-blue-600" /> Mijn Profiel
           </h3>
-          <p className="text-slate-500 mt-1 text-sm">Stel hier je naam in voor de begroeting.</p>
         </div>
         <div className="p-6 bg-slate-50 space-y-4">
           <div>
@@ -175,7 +177,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         </div>
       </div>
 
-      {/* ALS TECHNIEKER: MELDING */}
+      {/* TECHNIEKER MELDING */}
       {userRole === 'technician' && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center text-blue-800">
           <p>Je bent ingelogd als <strong>Technieker</strong>.</p>
@@ -186,9 +188,12 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
       {/* ADMIN SECTIES */}
       {userRole === 'admin' && (
         <>
+          {/* EXPORT */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
              <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Download size={20} className="text-blue-600" /> Data Backup & Export</h3>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Download size={20} className="text-blue-600" /> Data Backup & Export
+              </h3>
             </div>
             <div className="p-6 bg-slate-50">
               <button onClick={handleExport} className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-100 shadow-sm">
@@ -197,6 +202,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
             </div>
           </div>
 
+          {/* AUDIT LOGS */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -235,35 +241,59 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         </>
       )}
 
-      {/* WACHTWOORD WIJZIGEN */}
+      {/* WACHTWOORD */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Lock size={20} className="text-blue-600" /> Wachtwoord Wijzigen</h3>
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Lock size={20} className="text-blue-600" /> Wachtwoord Wijzigen
+          </h3>
         </div>
         <form onSubmit={handleChangePassword} className="p-6 bg-slate-50 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nieuw Wachtwoord</label>
             <div className="flex gap-2">
-              <input type="password" placeholder="Minimaal 6 tekens" className="flex-1 p-2 border border-slate-300 rounded-lg" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-              <button type="submit" disabled={pwLoading || !newPassword} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">Opslaan</button>
+              <input 
+                type="password" 
+                placeholder="Minimaal 6 tekens" 
+                className="flex-1 p-2 border border-slate-300 rounded-lg" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)} 
+              />
+              <button 
+                type="submit" 
+                disabled={pwLoading || !newPassword} 
+                className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                Opslaan
+              </button>
             </div>
           </div>
-          {pwMessage && <div className={`text-sm p-3 rounded-lg ${pwMessage.includes('Succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{pwMessage}</div>}
+          {pwMessage && (
+            <div className={`text-sm p-3 rounded-lg ${pwMessage.includes('Succes') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {pwMessage}
+            </div>
+          )}
         </form>
       </div>
 
-      {/* GEVARENZONE */}
+      {/* GEVARENZONE (JAAR RESET) */}
       {userRole === 'admin' && (
         <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
            <div className="p-6 border-b border-slate-100 bg-red-50">
-            <h3 className="text-lg font-bold text-red-800 flex items-center gap-2"><RefreshCw size={20} /> Gevarenzone: Nieuw Dienstjaar</h3>
+            <h3 className="text-lg font-bold text-red-800 flex items-center gap-2">
+              <RefreshCw size={20} /> Gevarenzone: Nieuw Dienstjaar
+            </h3>
           </div>
           <div className="p-6 bg-white space-y-4">
             <div className="flex gap-4 items-start p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-sm">
               <AlertTriangle size={20} className="shrink-0 mt-0.5 text-orange-500" />
-              <p>Hiermee worden <strong>alle dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>. <br/> Doe dit alleen bij de start van een nieuw dienstjaar.</p>
+              <p>Hiermee worden <strong>alle dossiers</strong> gereset naar de status <strong>"Niet Uitgevoerd"</strong>.</p>
             </div>
-            <button onClick={handleResetClick} disabled={loading} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm">
+            <button 
+              onClick={handleResetClick} 
+              disabled={loading} 
+              className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm"
+            >
               {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
             </button>
           </div>

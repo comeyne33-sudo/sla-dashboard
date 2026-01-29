@@ -7,7 +7,7 @@ interface DashboardProps {
   onNavigate: (view: string) => void;
   onNavigateToList: (filter: 'all' | 'critical' | 'planning' | 'done') => void;
   userRole: UserRole;
-  userProfile: UserProfile | null; // <--- NIEUW
+  userProfile: UserProfile | null;
 }
 
 export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userProfile }: DashboardProps) => {
@@ -16,7 +16,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
   const [downloadTarget, setDownloadTarget] = useState<{url: string, name: string} | null>(null);
   const [greeting, setGreeting] = useState('');
 
-  // 1. DYNAMISCHE BEGROETING
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Goedemorgen');
@@ -24,9 +23,7 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
     else setGreeting('Goedenavond');
   }, []);
   
-  // 2. TELLERS SPLITSEN (Salto vs Renson)
   const totalCount = safeData.length;
-  // Let op: Bestaande data heeft misschien nog geen categorie. We gaan er nu vanuit dat null = Salto
   const saltoCount = safeData.filter(s => s.category === 'Salto' || !s.category).length;
   const rensonCount = safeData.filter(s => s.category === 'Renson').length;
 
@@ -62,7 +59,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
     <>
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* HEADER MET BEGROETING */}
         <header>
           <h1 className="text-3xl font-bold text-slate-900">
             {greeting}, <span className="text-blue-600">{userProfile?.display_name || (userRole === 'admin' ? 'Beheerder' : 'Technieker')}</span>
@@ -137,7 +133,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
             <span className="font-semibold text-lg">SLA's in kaart</span>
           </button>
 
-          {/* Nieuwe SLA (ADMIN) */}
           {userRole === 'admin' && (
             <button 
               onClick={() => onNavigate('add')}
@@ -150,7 +145,6 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
             </button>
           )}
 
-          {/* TOOLS: ALLEEN ZICHTBAAR VOOR ADMIN (Technieker ziet dit niet) */}
           {userRole === 'admin' && (
             <>
               <button 
@@ -184,13 +178,29 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
               <div className="p-3 bg-blue-50 rounded-full text-blue-600">
                 <Download size={24} />
               </div>
-              <button onClick={() => setShowDownloadModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              <button onClick={() => setShowDownloadModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
             </div>
+            
             <h3 className="text-xl font-bold text-slate-900 mb-2">Bestand Downloaden?</h3>
-            <p className="text-slate-500 mb-6">Je staat op het punt om <strong>{downloadTarget?.name}</strong> te downloaden. Wil je doorgaan?</p>
+            <p className="text-slate-500 mb-6">
+              Je staat op het punt om <strong>{downloadTarget?.name}</strong> te downloaden. Wil je doorgaan?
+            </p>
+
             <div className="flex gap-3">
-              <button onClick={() => setShowDownloadModal(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors">Annuleren</button>
-              <button onClick={confirmDownload} className="flex-1 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">Downloaden</button>
+              <button 
+                onClick={() => setShowDownloadModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Annuleren
+              </button>
+              <button 
+                onClick={confirmDownload}
+                className="flex-1 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Downloaden
+              </button>
             </div>
           </div>
         </div>

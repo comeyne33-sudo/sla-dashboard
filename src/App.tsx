@@ -7,24 +7,26 @@ import { SLAList } from './components/dashboard/OverviewList';
 import { SLAMap } from './components/dashboard/SLAMap';
 import { SLAForm } from './components/dashboard/SLAForm';
 import { Settings } from './pages/Settings';
+import { ExecutionView } from './components/dashboard/ExecutionView';
 import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
-import type { SLA, UserRole, UserProfile } from './types/sla'; // UserProfile type toegevoegd
+import type { SLA, UserRole, UserProfile } from './types/sla';
 import { AlertTriangle, X } from 'lucide-react';
 
-type View = 'home' | 'list' | 'map' | 'add' | 'settings';
+type View = 'home' | 'list' | 'map' | 'add' | 'settings' | 'execution';
 export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('admin');
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null); // <--- NIEUW: PROFIEL STATE
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>([]);
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
+  const [executionItem, setExecutionItem] = useState<SLA | null>(null);
+
   const [loading, setLoading] = useState(true);
-  
   const [listFilter, setListFilter] = useState<ListFilterType>('all');
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [showYearEndWarning, setShowYearEndWarning] = useState(false);
@@ -33,7 +35,7 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       checkRole(session);
-      if (session) fetchProfile(session.user.id); // Haal profiel op
+      if (session) fetchProfile(session.user.id);
       setLoading(false);
     });
 
@@ -44,9 +46,7 @@ function App() {
     });
 
     const today = new Date();
-    if (today.getMonth() === 11) {
-      setShowYearEndWarning(true);
-    }
+    if (today.getMonth() === 11) setShowYearEndWarning(true);
 
     return () => subscription.unsubscribe();
   }, []);
@@ -59,14 +59,8 @@ function App() {
     }
   };
 
-  // NIEUW: Haal profiel (naam) op uit DB
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (data) setUserProfile(data as UserProfile);
   };
 
@@ -97,7 +91,6 @@ function App() {
     else setSlaData(data as SLA[]);
   };
 
-  // ... (fetchCoordinates, handleSaveSLA, handleDeleteSLA, handleYearReset blijven hetzelfde)
   const fetchCoordinates = async (address: string, city: string) => {
     try {
       const query = `${address}, ${city}, Belgium`;
@@ -181,15 +174,20 @@ function App() {
     setSession(null);
     setSlaData([]);
     setUserRole('admin');
-    setUserProfile(null); // Reset profiel
+    setUserProfile(null);
   };
 
   const startEditing = (item: SLA) => { setEditingItem(item); setCurrentView('add'); };
   const startNew = () => { setEditingItem(null); setCurrentView('add'); };
-
-  const handleViewSLA = (id: string) => {
-    setCurrentView('list');
-    setListFilter('all');
+  
+  // NIEUW: Start Uitvoer Modus
+  const startExecution = (item: SLA) => { setExecutionItem(item); setCurrentView('execution'); };
+  
+  const handleFinishExecution = async () => {
+    showToast('Interventie afgerond!', 'success');
+    setExecutionItem(null);
+    await fetchSLAs();
+    setCurrentView('home');
   };
 
   const navigateToList = (filter: ListFilterType) => {
@@ -217,7 +215,9 @@ function App() {
                   <AlertTriangle size={28} />
                   <h2>Jaarwissel Opgelet!</h2>
                 </div>
-                <button onClick={() => setShowYearEndWarning(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                <button onClick={() => setShowYearEndWarning(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
               </div>
               <div className="space-y-4 text-slate-600">
                 <p>De jaarwisseling staat voor de deur.</p>
@@ -237,7 +237,7 @@ function App() {
           onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
           onNavigateToList={navigateToList}
           userRole={userRole}
-          userProfile={userProfile} // <--- Geef profiel door aan Dashboard
+          userProfile={userProfile}
         />
       )}
       
@@ -250,25 +250,40 @@ function App() {
           onRefresh={fetchSLAs}
           initialFilter={listFilter}
           userRole={userRole}
+          onExecute={startExecution}
         />
       )}
       
       {currentView === 'map' && (
-        <SLAMap data={slaData} onBack={() => setCurrentView('home')} onViewSLA={handleViewSLA} />
+        <SLAMap data={slaData} onBack={() => setCurrentView('home')} onViewSLA={(id) => { setCurrentView('list'); setListFilter('all'); }} />
       )}
       
       {currentView === 'add' && (
-        <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} userRole={userRole} />
+        <SLAForm 
+          key={editingItem ? editingItem.id : 'new'} 
+          onBack={() => setCurrentView('home')} 
+          onSubmit={handleSaveSLA} 
+          initialData={editingItem} 
+          userRole={userRole} 
+        />
       )}
       
+      {currentView === 'execution' && executionItem && (
+        <ExecutionView 
+          sla={executionItem}
+          onBack={() => setCurrentView('list')}
+          onFinish={handleFinishExecution}
+        />
+      )}
+
       {currentView === 'settings' && (
         <Settings 
           onBack={() => setCurrentView('home')} 
           onResetYear={handleYearReset}
           data={slaData}
           userRole={userRole}
-          userProfile={userProfile} // <--- Geef profiel door aan Settings
-          onProfileUpdate={() => session && fetchProfile(session.user.id)} // <--- Update functie
+          userProfile={userProfile}
+          onProfileUpdate={() => session && fetchProfile(session.user.id)}
         />
       )}
     </Shell>
