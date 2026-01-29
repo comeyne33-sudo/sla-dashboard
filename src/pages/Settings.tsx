@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, User, Archive, CheckSquare, Hash } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, User, Archive, CheckSquare, Hash, Trash2, Calculator } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { SLA, UserRole, AuditLog, UserProfile } from '../types/sla';
 
@@ -26,8 +26,16 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   const [displayName, setDisplayName] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
 
-  // Nacalculatie state
-  const [recalcList, setRecalcList] = useState<SLA[]>([]);
+  // NACALCULATIE STATE (NIEUW)
+  const [selectedSLAId, setSelectedSLAId] = useState<string>('');
+  const [actualHours, setActualHours] = useState<string>('');
+  const [calcResult, setCalcResult] = useState<{status: string, text: string, color: string} | null>(null);
+  
+  // Lijsten filteren voor nacalculatie
+  // 1. Te doen: Wel uitgevoerd, nog geen nacalculatie
+  const pendingCalculations = data.filter(s => s.isExecuted && !s.calculation_done);
+  // 2. Klaar: Wel uitgevoerd EN wel nacalculatie
+  const completedCalculations = data.filter(s => s.isExecuted && s.calculation_done);
 
   useEffect(() => {
     if (userProfile?.display_name) {
@@ -35,9 +43,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     }
     if (userRole === 'admin') {
       fetchLogs();
-      // Filter dossiers die uitgevoerd zijn maar nog geen nacalculatie hebben
-      const toRecalc = data.filter(s => s.isExecuted && !s.calculation_done);
-      setRecalcList(toRecalc);
     }
   }, [userRole, userProfile, data]);
 
@@ -50,6 +55,73 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     
     if (data) setAuditLogs(data as AuditLog[]);
   };
+
+  // --- NACALCULATIE LOGICA (NIEUW) ---
+  const calculateDifference = (planned: number, actual: number) => {
+    // Logica: 
+    // Minder uren = Winst
+    // Max 10% meer = Correct
+    // Meer dan 10% meer = Verlies
+    
+    if (actual < planned) {
+      return { status: 'profit', text: 'Winstgevender dan gedacht', color: 'text-green-700 bg-green-50 border-green-200' };
+    } else if (actual <= planned * 1.10) { 
+      return { status: 'correct', text: 'Correct uitgerekend', color: 'text-blue-700 bg-blue-50 border-blue-200' };
+    } else {
+      return { status: 'loss', text: 'Te weinig uren voorzien in SLA', color: 'text-red-700 bg-red-50 border-red-200' };
+    }
+  };
+
+  // Update resultaat als input verandert
+  useEffect(() => {
+    if (selectedSLAId && actualHours) {
+      const sla = data.find(s => s.id === selectedSLAId);
+      // We gebruiken || 0 om errors te voorkomen als hoursRequired undefined is
+      const planned = sla?.hoursRequired || 0;
+      
+      if (planned > 0) {
+        const result = calculateDifference(planned, parseFloat(actualHours));
+        setCalcResult(result);
+      }
+    } else {
+      setCalcResult(null);
+    }
+  }, [selectedSLAId, actualHours, data]);
+
+  const saveCalculation = async () => {
+    if (!selectedSLAId || !calcResult) return;
+    
+    const { error } = await supabase.from('slas').update({
+      calculation_done: true,
+      actual_hours: parseFloat(actualHours),
+      calculation_result: calcResult.status,
+      calculation_note: calcResult.text
+    }).eq('id', selectedSLAId);
+
+    if (!error) {
+      onProfileUpdate(); // Data verversen
+      setSelectedSLAId(''); // Formulier resetten
+      setActualHours('');
+      alert('Nacalculatie succesvol opgeslagen!');
+    } else {
+      alert('Fout bij opslaan nacalculatie.');
+    }
+  };
+
+  const deleteCalculation = async (id: string) => {
+    if(!confirm("Ben je zeker? Dit verwijdert de nacalculatie en zet het dossier terug op 'te berekenen'.")) return;
+    
+    const { error } = await supabase.from('slas').update({
+      calculation_done: false,
+      actual_hours: null,
+      calculation_result: null,
+      calculation_note: null
+    }).eq('id', id);
+
+    if(!error) onProfileUpdate();
+  };
+
+  // --- BESTAANDE HANDLERS ---
 
   const handleSaveProfile = async () => {
     setProfileSaving(true);
@@ -75,24 +147,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
     setProfileSaving(false);
   };
 
-  const handleRecalcDone = async (id: string) => {
-    if (!confirm('Markeren als financieel afgehandeld?')) return;
-
-    const { error } = await supabase
-      .from('slas')
-      .update({ calculation_done: true })
-      .eq('id', id);
-
-    if (!error) {
-      // Update lokale lijst direct voor snelle feedback
-      setRecalcList(prev => prev.filter(item => item.id !== id));
-      // Trigger update in main app (via onProfileUpdate als hack, of eigenlijk moet App data refreshen)
-      onProfileUpdate(); 
-    } else {
-      alert('Fout bij updaten.');
-    }
-  };
-
   const handleResetClick = async () => {
     if (confirm("⚠️ LET OP: Weet je het zeker?\n\nHiermee zet je ALLE contracten terug op 'Niet Uitgevoerd'.\nDoe dit alleen aan het begin van het nieuwe jaar!")) {
       if (confirm("Echt zeker? Dit kan niet ongedaan worden gemaakt.")) {
@@ -105,7 +159,8 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   };
 
   const handleExport = () => {
-    const headers = ['Categorie', 'Klant', 'Stad', 'Adres', 'Type/Details', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?', 'Nacalculatie OK?'];
+    // Aangepaste export met nieuwe velden
+    const headers = ['Categorie', 'Klant', 'Stad', 'Gepland (u)', 'Gepresteerd (u)', 'Resultaat', 'Status'];
     
     const csvContent = [
       headers.join(';'), 
@@ -113,13 +168,10 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
         item.category,
         `"${item.clientName}"`,
         `"${item.city}"`,
-        `"${item.location}"`,
-        item.category === 'Salto' ? item.type : item.renson_height,
-        item.status,
-        item.price,
-        item.plannedMonth,
-        item.isExecuted ? 'JA' : 'NEE',
-        item.calculation_done ? 'JA' : 'NEE'
+        item.hoursRequired,
+        item.actual_hours || '', // Nieuw veld
+        item.calculation_note || '', // Nieuw veld
+        item.isExecuted ? 'Uitgevoerd' : 'Open'
       ].join(';'))
     ].join('\n');
 
@@ -164,7 +216,7 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-10">
+    <div className="max-w-4xl mx-auto space-y-8 pb-10">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
@@ -213,43 +265,124 @@ export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onP
       {/* ADMIN SECTIES */}
       {userRole === 'admin' && (
         <>
-          {/* NIEUW: OPENSTAANDE NACALCULATIES */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Archive size={20} className="text-purple-600" /> Openstaande Nacalculaties
+          {/* --- NIEUW: NACALCULATIE MODULE --- */}
+          <div className="bg-white rounded-xl border border-indigo-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-indigo-100 bg-indigo-50">
+              <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                <Calculator size={20} /> Nacalculatie Tool
               </h3>
-              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold">
-                {recalcList.length} te doen
-              </span>
+              <p className="text-sm text-indigo-600 mt-1">
+                Vergelijk geplande uren met werkelijke uren voor uitgevoerde SLA's.
+              </p>
             </div>
             
-            {recalcList.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
-                <CheckSquare size={32} className="mx-auto mb-2 text-slate-300" />
-                <p>Geen openstaande nacalculaties. Alles is bijgewerkt!</p>
-              </div>
-            ) : (
-              <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
-                {recalcList.map(item => (
-                  <div key={item.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* LINKER KOLOM: NIEUWE BEREKENING */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-slate-900 border-b pb-2">Nieuwe berekening invoeren</h4>
+                
+                {pendingCalculations.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-100 text-slate-500 text-sm">
+                    <CheckSquare size={24} className="mx-auto mb-2 text-slate-300" />
+                    <p>Alles is bijgewerkt!</p>
+                    <p>Geen openstaande dossiers.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
                     <div>
-                      <p className="font-bold text-slate-900">{item.clientName}</p>
-                      <div className="flex gap-3 text-xs text-slate-500">
-                        <span>{item.city}</span>
-                        {item.vo_number && <span className="flex items-center gap-1"><Hash size={10} /> {item.vo_number}</span>}
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Selecteer Dossier</label>
+                      <select 
+                        className="w-full p-2.5 border border-slate-300 rounded-lg bg-white" 
+                        value={selectedSLAId} 
+                        onChange={e => { setSelectedSLAId(e.target.value); setActualHours(''); setCalcResult(null); }}
+                      >
+                        <option value="">-- Kies een werf --</option>
+                        {pendingCalculations.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.clientName} ({s.city}) - Plan: {s.hoursRequired}u
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {selectedSLAId && (
+                      <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Effectief gepresteerde uren</label>
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              step="0.5" 
+                              className="w-full p-2 border border-slate-300 rounded-lg pr-10" 
+                              value={actualHours} 
+                              onChange={e => setActualHours(e.target.value)} 
+                              placeholder="bv. 4.5" 
+                            />
+                            <span className="absolute right-3 top-2 text-slate-400 text-sm">uur</span>
+                          </div>
+                        </div>
+                        
+                        {calcResult && (
+                          <div className={`p-3 rounded-lg text-sm font-bold flex items-center gap-2 border ${calcResult.color}`}>
+                            <Activity size={18} /> 
+                            <span>{calcResult.text}</span>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={saveCalculation} 
+                          disabled={!actualHours} 
+                          className="w-full py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Save size={18} /> Opslaan & Afronden
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* RECHTER KOLOM: HISTORIEK */}
+              <div className="border-l border-slate-100 pl-0 md:pl-8">
+                <h4 className="font-semibold text-slate-900 mb-4 border-b pb-2 flex justify-between items-center">
+                  <span>Historiek ({completedCalculations.length})</span>
+                </h4>
+                
+                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
+                  {completedCalculations.length === 0 && (
+                    <p className="text-slate-400 text-sm italic">Nog geen nacalculaties uitgevoerd.</p>
+                  )}
+
+                  {completedCalculations.map(item => (
+                    <div key={item.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm group hover:border-indigo-200 transition-colors">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-bold text-slate-800 truncate pr-2">{item.clientName}</span>
+                        <button 
+                          onClick={() => deleteCalculation(item.id)} 
+                          className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                          title="Verwijder berekening"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-2">
+                        <div>Plan: <span className="font-medium">{item.hoursRequired}u</span></div>
+                        <div>Echt: <span className="font-medium">{item.actual_hours}u</span></div>
+                      </div>
+
+                      <div className={`text-xs font-bold px-2 py-1 rounded inline-block w-full text-center ${
+                        item.calculation_result === 'profit' ? 'bg-green-100 text-green-700' : 
+                        item.calculation_result === 'loss' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {item.calculation_note}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => handleRecalcDone(item.id)}
-                      className="px-3 py-1.5 bg-white border border-purple-200 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
-                    >
-                      Markeer Afgehandeld
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* EXPORT */}

@@ -53,6 +53,15 @@ export interface SLA {
   vo_number?: string;
   calculation_done: boolean;
 
+  // NACALCULATIE (NIEUW)
+  actual_hours?: number;
+  calculation_result?: 'profit' | 'correct' | 'loss';
+  calculation_note?: string;
+
+  // WERKBON / HANDTEKENING (NIEUW)
+  signer_name?: string;
+  signature_url?: string;
+
   // SALTO SPECIFIEK
   type?: SLAType;
   partsNeeded?: string;
