@@ -1,37 +1,41 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, Calculator, Plus, X } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ArrowLeft, CheckCircle, Download, Lock, Save, Activity, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { SLA, UserRole, AuditLog, PostCalculation } from '../types/sla';
+import type { SLA, UserRole, AuditLog, UserProfile } from '../types/sla';
 
 interface SettingsProps {
   onBack: () => void;
   onResetYear: () => Promise<void>;
   data: SLA[];
   userRole: UserRole;
+  userProfile: UserProfile | null; // <--- NIEUW: Huidig profiel
+  onProfileUpdate: () => void;     // <--- NIEUW: Trigger om App te updaten
 }
 
-export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps) => {
+export const Settings = ({ onBack, onResetYear, data, userRole, userProfile, onProfileUpdate }: SettingsProps) => {
   const [loading, setLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
-  // States voor Nacalculatie
-  const [calculations, setCalculations] = useState<PostCalculation[]>([]);
-  const [showCalcModal, setShowCalcModal] = useState(false);
-  const [selectedSlaId, setSelectedSlaId] = useState('');
-  const [inputActualHours, setInputActualHours] = useState('');
-  
+  // Wachtwoord state
   const [newPassword, setNewPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
 
-  // 1. Data ophalen bij start
+  // Profiel state (Naam)
+  const [displayName, setDisplayName] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+
   useEffect(() => {
+    // Vul naam in als die er al is
+    if (userProfile?.display_name) {
+      setDisplayName(userProfile.display_name);
+    }
+    
     if (userRole === 'admin') {
       fetchLogs();
-      fetchCalculations();
     }
-  }, [userRole]);
+  }, [userRole, userProfile]);
 
   const fetchLogs = async () => {
     const { data } = await supabase
@@ -39,65 +43,34 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-    
     if (data) setAuditLogs(data as AuditLog[]);
   };
 
-  const fetchCalculations = async () => {
-    // We halen de calculaties op EN de gekoppelde SLA naam (via de foreign key)
-    const { data, error } = await supabase
-      .from('post_calculations')
-      .select(`
-        *,
-        slas (
-          clientName,
-          city
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) console.error('Error fetching calculations:', error);
-    if (data) setCalculations(data as any[]);
-  };
-
-  // 2. Logica voor Nacalculatie Opslaan
-  const handleSaveCalculation = async () => {
-    if (!selectedSlaId || !inputActualHours) return;
-
-    const sla = data.find(s => s.id === selectedSlaId);
-    if (!sla) return;
-
-    const planned = sla.hoursRequired;
-    const actual = parseFloat(inputActualHours);
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
     
-    // DE STATUS LOGICA (Jouw regels)
-    let status: 'profit' | 'warning' | 'loss' = 'profit';
-    const threshold = planned * 1.15; // 15% marge
-
-    if (actual < planned) {
-      status = 'profit'; // Groen (Minder uren dan voorzien)
-    } else if (actual <= threshold) {
-      status = 'warning'; // Oranje (Gelijk of max 15% meer)
-    } else {
-      status = 'loss'; // Rood (Meer dan 15% overschrijding)
+    if (user) {
+      // Upsert: Maak aan als niet bestaat, anders update
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: user.id, 
+          email: user.email, 
+          display_name: displayName 
+        });
+      
+      if (!error) {
+        onProfileUpdate(); // Vertel App.tsx dat er een nieuwe naam is
+        alert('Naam opgeslagen!');
+      } else {
+        console.error(error);
+        alert('Fout bij opslaan naam.');
+      }
     }
-
-    const { error } = await supabase.from('post_calculations').insert([{
-      sla_id: selectedSlaId,
-      planned_hours: planned,
-      actual_hours: actual,
-      status: status
-    }]);
-
-    if (!error) {
-      fetchCalculations();
-      setShowCalcModal(false);
-      setSelectedSlaId('');
-      setInputActualHours('');
-    }
+    setProfileSaving(false);
   };
 
-  // 3. Andere functies (Reset, Export, Wachtwoord)
   const handleResetClick = async () => {
     if (confirm("⚠️ LET OP: Weet je het zeker?\n\nHiermee zet je ALLE contracten terug op 'Niet Uitgevoerd'.\nDoe dit alleen aan het begin van het nieuwe jaar!")) {
       if (confirm("Echt zeker? Dit kan niet ongedaan worden gemaakt.")) {
@@ -110,14 +83,15 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
   };
 
   const handleExport = () => {
-    const headers = ['Klant', 'Stad', 'Adres', 'Type', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?'];
+    const headers = ['Categorie', 'Klant', 'Stad', 'Adres', 'Type/Details', 'Status', 'Prijs', 'Maand', 'Uitgevoerd?'];
     const csvContent = [
       headers.join(';'), 
       ...data.map(item => [
+        item.category, // <--- NIEUW: Categorie in export
         `"${item.clientName}"`,
         `"${item.city}"`,
         `"${item.location}"`,
-        item.type,
+        item.category === 'Salto' ? item.type : item.renson_height, // <--- Dynamisch veld
         item.status,
         item.price,
         item.plannedMonth,
@@ -161,11 +135,8 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
     );
   }
 
-  // Filter alleen uitgevoerde SLA's voor de dropdown
-  const executedSLAs = data.filter(s => s.isExecuted);
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-10">
+    <div className="max-w-3xl mx-auto space-y-8 pb-10">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft size={24} className="text-slate-600" />
@@ -173,6 +144,38 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
         <h2 className="text-2xl font-bold text-slate-900">Instellingen & Beheer</h2>
       </div>
 
+      {/* BLOK 1: MIJN PROFIEL (NIEUW) */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <User size={20} className="text-blue-600" /> Mijn Profiel
+          </h3>
+          <p className="text-slate-500 mt-1 text-sm">Stel hier je naam in voor de begroeting.</p>
+        </div>
+        <div className="p-6 bg-slate-50 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Weergavenaam</label>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="bv. Jan Peeters" 
+                className="flex-1 p-2 border border-slate-300 rounded-lg" 
+                value={displayName} 
+                onChange={e => setDisplayName(e.target.value)} 
+              />
+              <button 
+                onClick={handleSaveProfile} 
+                disabled={profileSaving}
+                className="px-4 py-2 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-900 disabled:opacity-50"
+              >
+                {profileSaving ? '...' : 'Opslaan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ALS TECHNIEKER: MELDING */}
       {userRole === 'technician' && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center text-blue-800">
           <p>Je bent ingelogd als <strong>Technieker</strong>.</p>
@@ -180,63 +183,9 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
         </div>
       )}
 
+      {/* ADMIN SECTIES */}
       {userRole === 'admin' && (
         <>
-          {/* --- NIEUW: NACALCULATIE MODULE --- */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Calculator size={20} className="text-purple-600" /> Financiële Nacalculatie
-                </h3>
-                <p className="text-sm text-slate-500">Vergelijk geplande uren met werkelijke prestaties.</p>
-              </div>
-              <button 
-                onClick={() => setShowCalcModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Plus size={16} /> Nieuwe Berekening
-              </button>
-            </div>
-            
-            {/* Scrollbare Lijst (Max 5 items hoogte) */}
-            <div className="max-h-60 overflow-y-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-white text-slate-500 font-medium border-b border-slate-100 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3">Datum</th>
-                    <th className="px-6 py-3">Klant</th>
-                    <th className="px-6 py-3">Gepland</th>
-                    <th className="px-6 py-3">Werkelijk</th>
-                    <th className="px-6 py-3">Resultaat</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {calculations.map((calc) => (
-                    <tr key={calc.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-3 text-slate-500">{new Date(calc.created_at).toLocaleDateString('nl-BE')}</td>
-                      <td className="px-6 py-3 font-medium text-slate-900">
-                        {calc.slas?.clientName || 'Onbekend'}
-                        <span className="block text-xs text-slate-400">{calc.slas?.city}</span>
-                      </td>
-                      <td className="px-6 py-3 text-slate-600">{calc.planned_hours}u</td>
-                      <td className="px-6 py-3 text-slate-600 font-medium">{calc.actual_hours}u</td>
-                      <td className="px-6 py-3">
-                        {calc.status === 'profit' && <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">Winstgevend</span>}
-                        {calc.status === 'warning' && <span className="px-2 py-1 rounded text-xs font-bold bg-orange-100 text-orange-700">Krap (≤ 15%)</span>}
-                        {calc.status === 'loss' && <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">Margewaarschuwing</span>}
-                      </td>
-                    </tr>
-                  ))}
-                  {calculations.length === 0 && (
-                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Nog geen berekeningen gemaakt.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* DATA EXPORT */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
              <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Download size={20} className="text-blue-600" /> Data Backup & Export</h3>
@@ -248,17 +197,15 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
             </div>
           </div>
 
-          {/* AUDIT LOGS - Scrollbaar gemaakt */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Activity size={20} className="text-blue-600" /> Audit Logboek (Laatste 50)
               </h3>
             </div>
-            {/* HIER ZIT DE SCROLL FIX: max-h-60 */}
-            <div className="max-h-60 overflow-y-auto">
+            <div className="max-h-[300px] overflow-y-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200 sticky top-0">
+                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-3">Datum</th>
                     <th className="px-6 py-3">Gebruiker</th>
@@ -319,68 +266,6 @@ export const Settings = ({ onBack, onResetYear, data, userRole }: SettingsProps)
             <button onClick={handleResetClick} disabled={loading} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-sm">
               {loading ? 'Bezig met resetten...' : 'Start Nieuw Jaar (Reset alles)'}
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL VOOR NIEUWE BEREKENING --- */}
-      {showCalcModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Nieuwe Nacalculatie</h3>
-              <button onClick={() => setShowCalcModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Selecteer een uitgevoerd dossier</label>
-                <select 
-                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
-                  value={selectedSlaId}
-                  onChange={(e) => {
-                    setSelectedSlaId(e.target.value);
-                    setInputActualHours(''); // Reset input bij wisselen
-                  }}
-                >
-                  <option value="">-- Kies een klant --</option>
-                  {executedSLAs.map(sla => (
-                    <option key={sla.id} value={sla.id}>{sla.clientName} ({sla.city})</option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedSlaId && (
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 text-sm text-purple-800">
-                  <p>Dit dossier werd berekend op <strong>{data.find(s => s.id === selectedSlaId)?.hoursRequired} uur</strong> werk.</p>
-                  <p className="mt-1">Hoeveel tijd nam het werkelijk in beslag?</p>
-                </div>
-              )}
-
-              <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Werkelijke Uren</label>
-                 <input 
-                    type="number" 
-                    step="0.5"
-                    className="w-full p-2 border border-slate-300 rounded-lg"
-                    placeholder="bv. 4.5"
-                    value={inputActualHours}
-                    onChange={e => setInputActualHours(e.target.value)}
-                    disabled={!selectedSlaId}
-                 />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setShowCalcModal(false)} className="flex-1 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200">Annuleren</button>
-                <button 
-                  onClick={handleSaveCalculation} 
-                  disabled={!selectedSlaId || !inputActualHours}
-                  className="flex-1 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                >
-                  Opslaan
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

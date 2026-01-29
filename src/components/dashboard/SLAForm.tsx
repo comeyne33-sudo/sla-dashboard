@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
-import type { SLA, SLAType, Attachment, UserRole } from '../../types/sla';
+import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2, Hash, ArrowUpFromLine, User } from 'lucide-react';
+import type { SLA, SLAType, Attachment, UserRole, SLACategory } from '../../types/sla';
 import { supabase } from '../../lib/supabase';
 
 interface SLAFormProps {
@@ -14,12 +14,23 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
   const isTechnician = userRole === 'technician';
 
   const [formData, setFormData] = useState({
+    category: (initialData?.category || 'Salto') as SLACategory,
+    vo_number: initialData?.vo_number || '',
+    
     clientName: initialData?.clientName || '',
     location: initialData?.location || '',
     city: initialData?.city || '',
+    
+    // Salto specifiek
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
     hoursRequired: initialData?.hoursRequired || 2,
+    
+    // Renson specifiek
+    renson_height: initialData?.renson_height || 'Gelijkvloers',
+    renson_installer: initialData?.renson_installer || '',
+    renson_size: initialData?.renson_size || '',
+
     plannedMonth: initialData?.plannedMonth || 1, 
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
@@ -28,6 +39,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
     attachments: initialData?.attachments || [] as Attachment[],
     price: initialData?.price || 0,
     isExecuted: initialData?.isExecuted || false,
+    calculation_done: initialData?.calculation_done || false,
   });
 
   const [uploading, setUploading] = useState(false);
@@ -42,7 +54,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
     setUploading(true);
     const files = Array.from(e.target.files);
     const newAttachments: Attachment[] = [];
-
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
@@ -50,25 +61,15 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
         const { error: uploadError } = await supabase.storage.from('sla-files').upload(fileName, file);
         if (uploadError) throw uploadError;
         const { data: { publicUrl } } = supabase.storage.from('sla-files').getPublicUrl(fileName);
-        newAttachments.push({
-          name: file.name,
-          url: publicUrl,
-          type: file.type.startsWith('image/') ? 'image' : 'file'
-        });
-      } catch (error) {
-        console.error(error);
-        alert('Fout bij uploaden.');
-      }
+        newAttachments.push({ name: file.name, url: publicUrl, type: file.type.startsWith('image/') ? 'image' : 'file' });
+      } catch (error) { console.error(error); alert('Fout bij uploaden.'); }
     }
     setFormData(prev => ({ ...prev, attachments: [...prev.attachments, ...newAttachments] }));
     setUploading(false);
   };
 
   const removeAttachment = (indexToRemove: number) => {
-    setFormData(prev => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, index) => index !== indexToRemove)
-    }));
+    setFormData(prev => ({ ...prev, attachments: prev.attachments.filter((_, index) => index !== indexToRemove) }));
   };
 
   const months = [
@@ -86,13 +87,44 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
         </button>
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
-            {initialData ? 'Dossier Bekijken/Bewerken' : 'Nieuw Contract'}
+            {initialData ? 'Dossier Bekijken/Bewerken' : 'Nieuw Dossier'}
           </h2>
-          {isTechnician && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Read-only Modus (Alleen commentaar/bijlagen)</span>}
+          {isTechnician && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Read-only Modus</span>}
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        
+        {/* 1. CATEGORIE KEUZE */}
+        <div className="border-b border-slate-200">
+          <div className="grid grid-cols-2">
+            <button
+              type="button"
+              disabled={isTechnician}
+              onClick={() => setFormData({...formData, category: 'Salto'})}
+              className={`p-4 text-center font-bold transition-colors ${
+                formData.category === 'Salto' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              SALTO
+            </button>
+            <button
+              type="button"
+              disabled={isTechnician}
+              onClick={() => setFormData({...formData, category: 'Renson'})}
+              className={`p-4 text-center font-bold transition-colors ${
+                formData.category === 'Renson' 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              RENSON
+            </button>
+          </div>
+        </div>
+
         <div className="p-6 space-y-8">
           
           {initialData && (
@@ -112,81 +144,129 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             </div>
           )}
 
+          {/* ALGEMENE GEGEVENS */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Building size={18} className="text-blue-600" /> Bedrijfsgegevens</h3>
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Building size={18} className="text-slate-500" /> Algemene Info</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Klantnaam</label>
-                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Contactpersoon</label>
-                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telefoon</label>
-                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input required type="email" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MapPin size={18} className="text-emerald-600" /> Locatie</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Stad</label>
-                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Specifieke Locatie</label>
-                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Wrench size={18} className="text-orange-500" /> Service Level</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="col-span-1 md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Type Contract</label>
-                <select disabled={isTechnician} className="w-full p-2.5 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-500" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
-                  <option value="Basic">Basic</option>
-                  <option value="Comfort">Comfort</option>
-                  <option value="Premium">Premium</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Benodigde Onderdelen</label>
-                <input type="text" disabled={isTechnician || formData.type === 'Basic'} className={`w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500`} value={formData.type === 'Basic' ? '' : formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Geschatte Uren</label>
-                <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
+                {/* FIX: 'block' verwijderd, 'flex' behouden */}
+                <label className="text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                   <Hash size={14} /> VO Nummer (Optioneel)
+                </label>
+                <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" placeholder="bv. VO-2024-..." value={formData.vo_number} onChange={e => setFormData({...formData, vo_number: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Prijs (€)</label>
-                <input type="number" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100 disabled:text-slate-500" value={formData.price} onChange={e => setFormData({...formData, price: parseInt(e.target.value) || 0})} />
+                <input type="number" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.price} onChange={e => setFormData({...formData, price: parseInt(e.target.value) || 0})} />
               </div>
             </div>
           </div>
 
-          {/* HIER IS HET TERUGGEZETTE BLOK PLANNING */}
+          {/* LOCATIE & CONTACT */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MapPin size={18} className="text-slate-500" /> Locatie & Contact</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Stad</label>
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Adres</label>
+                <input required type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Contactpersoon</label>
+                    <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Telefoon</label>
+                    <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input type="email" disabled={isTechnician} className="w-full p-2 border border-slate-300 rounded-lg disabled:bg-slate-100" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} />
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* DYNAMISCH BLOK: SPECIFIEKE DETAILS */}
+          <div className={`rounded-xl border p-4 ${formData.category === 'Salto' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'}`}>
+            <h3 className={`font-bold flex items-center gap-2 mb-4 ${formData.category === 'Salto' ? 'text-blue-800' : 'text-emerald-800'}`}>
+              <Wrench size={20} />
+              Specificaties: {formData.category}
+            </h3>
+
+            {/* IF SALTO */}
+            {formData.category === 'Salto' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-blue-900 mb-1">Type Contract</label>
+                  <select disabled={isTechnician} className="w-full p-2.5 border border-blue-200 rounded-lg bg-white" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
+                    <option value="Basic">Basic (Software update only)</option>
+                    <option value="Comfort">Comfort</option>
+                    <option value="Premium">Premium</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-1">Benodigde Onderdelen</label>
+                  <input type="text" disabled={isTechnician || formData.type === 'Basic'} className="w-full p-2 border border-blue-200 rounded-lg" value={formData.type === 'Basic' ? '' : formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-1">Geschatte Uren</label>
+                  <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-blue-200 rounded-lg" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
+                </div>
+              </div>
+            )}
+
+            {/* IF RENSON */}
+            {formData.category === 'Renson' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  {/* FIX: 'block' verwijderd, 'flex' behouden */}
+                  <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
+                    <User size={14} /> Installateur
+                  </label>
+                  <input type="text" disabled={isTechnician} className="w-full p-2 border border-emerald-200 rounded-lg" placeholder="bv. Ramen & Deuren BV" value={formData.renson_installer} onChange={e => setFormData({...formData, renson_installer: e.target.value})} />
+                </div>
+                <div>
+                  {/* FIX: 'block' verwijderd, 'flex' behouden */}
+                  <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
+                     <ArrowUpFromLine size={14} /> Hoogte (Verdiep)
+                  </label>
+                  <select disabled={isTechnician} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white" value={formData.renson_height} onChange={e => setFormData({...formData, renson_height: e.target.value})}>
+                    <option value="Gelijkvloers">Gelijkvloers</option>
+                    <option value="Verdiep 1">Verdiep 1</option>
+                    <option value="Verdiep 2">Verdiep 2</option>
+                    <option value="Verdiep 3+">Verdiep 3+</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-emerald-900 mb-1">Grootte Screen (Optioneel)</label>
+                  <input type="text" disabled={isTechnician} className="w-full p-2 border border-emerald-200 rounded-lg" placeholder="bv. 4m x 2m" value={formData.renson_size} onChange={e => setFormData({...formData, renson_size: e.target.value})} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* PLANNING */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2">
-              <Calendar size={18} className="text-purple-600" /> Planning Uitvoering
+              <Calendar size={18} className="text-slate-500" /> Planning
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Geplande Maand</label>
                 <select 
-                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                   value={formData.plannedMonth} 
                   onChange={e => setFormData({...formData, plannedMonth: parseInt(e.target.value)})}
-                  disabled={isTechnician} // Alleen admin mag plannen
+                  disabled={isTechnician}
                 >
                   {months.map(m => (
                     <option key={m.val} value={m.val}>{m.label}</option>
@@ -196,13 +276,11 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             </div>
           </div>
 
+          {/* COMMENTS & ATTACHMENTS */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MessageSquare size={18} className="text-slate-500" /> Commentaar</h3>
-            <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Technieker opmerkingen..." />
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><Paperclip size={18} className="text-slate-500" /> Bijlagen</h3>
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MessageSquare size={18} className="text-slate-500" /> Opmerkingen & Foto's</h3>
+            <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Opmerkingen..." />
+            
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <label className={`flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg cursor-pointer hover:bg-slate-200 border border-slate-200 ${uploading ? 'opacity-50' : ''}`}>
@@ -226,6 +304,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
               )}
             </div>
           </div>
+
         </div>
 
         <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-200 sticky bottom-0">

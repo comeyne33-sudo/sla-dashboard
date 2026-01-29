@@ -9,7 +9,7 @@ import { SLAForm } from './components/dashboard/SLAForm';
 import { Settings } from './pages/Settings';
 import { Toast, ToastType } from './components/ui/Toast'; 
 import { supabase } from './lib/supabase';
-import type { SLA, UserRole } from './types/sla';
+import type { SLA, UserRole, UserProfile } from './types/sla'; // UserProfile type toegevoegd
 import { AlertTriangle, X } from 'lucide-react';
 
 type View = 'home' | 'list' | 'map' | 'add' | 'settings';
@@ -18,44 +18,29 @@ export type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('admin');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null); // <--- NIEUW: PROFIEL STATE
+
   const [currentView, setCurrentView] = useState<View>('home');
   const [slaData, setSlaData] = useState<SLA[]>([]);
   const [editingItem, setEditingItem] = useState<SLA | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // NIEUW: State voor de sleutel-animatie
-  const [showKeyAnimation, setShowKeyAnimation] = useState(false);
-
   const [listFilter, setListFilter] = useState<ListFilterType>('all');
   const [toast, setToast] = useState<{ msg: string; type: ToastType } | null>(null);
   const [showYearEndWarning, setShowYearEndWarning] = useState(false);
 
   useEffect(() => {
-    // 1. Initiële sessie check (bij F5 verversen)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       checkRole(session);
+      if (session) fetchProfile(session.user.id); // Haal profiel op
       setLoading(false);
     });
 
-    // 2. Luisteren naar veranderingen (Inloggen / Uitloggen)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      
-      // HIER ZIT DE TRUC:
-      // Als het event 'SIGNED_IN' is, betekent het dat de gebruiker NET heeft ingelogd.
-      if (event === 'SIGNED_IN') {
-        setShowKeyAnimation(true);
-        // Laat de GIF 2.5 seconden spelen, daarna pas doorgaan
-        setTimeout(() => {
-          setShowKeyAnimation(false);
-          setSession(session);
-          checkRole(session);
-        }, 2500); // 2500ms = 2.5 seconden (pas aan aan de lengte van je GIF)
-      } else {
-        // Bij andere events (zoals uitloggen of token refresh) gewoon direct updaten
-        setSession(session);
-        checkRole(session);
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      checkRole(session);
+      if (session) fetchProfile(session.user.id);
     });
 
     const today = new Date();
@@ -74,10 +59,20 @@ function App() {
     }
   };
 
+  // NIEUW: Haal profiel (naam) op uit DB
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (data) setUserProfile(data as UserProfile);
+  };
+
   useEffect(() => {
-    // Haal data pas op als we een sessie hebben EN de animatie voorbij is
-    if (session && !showKeyAnimation) fetchSLAs();
-  }, [session, showKeyAnimation]);
+    if (session) fetchSLAs();
+  }, [session]);
 
   const showToast = (msg: string, type: ToastType) => {
     setToast({ msg, type });
@@ -102,7 +97,7 @@ function App() {
     else setSlaData(data as SLA[]);
   };
 
-  // ... (fetchCoordinates functie blijft hetzelfde)
+  // ... (fetchCoordinates, handleSaveSLA, handleDeleteSLA, handleYearReset blijven hetzelfde)
   const fetchCoordinates = async (address: string, city: string) => {
     try {
       const query = `${address}, ${city}, Belgium`;
@@ -114,7 +109,7 @@ function App() {
   };
 
   const handleSaveSLA = async (formData: Omit<SLA, 'id' | 'status' | 'lat' | 'lng' | 'lastUpdate'>) => {
-     try {
+    try {
       const coords = await fetchCoordinates(formData.location, formData.city);
       const mapStatus = formData.isExecuted ? 'active' : 'warning';
       
@@ -173,7 +168,7 @@ function App() {
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (error) throw error;
-      await logAction('RESET', 'Jaarreset uitgevoerd (alle statussen gereset)');
+      await logAction('RESET', 'Jaarreset uitgevoerd');
       await fetchSLAs();
     } catch (error) {
       console.error(error);
@@ -186,6 +181,7 @@ function App() {
     setSession(null);
     setSlaData([]);
     setUserRole('admin');
+    setUserProfile(null); // Reset profiel
   };
 
   const startEditing = (item: SLA) => { setEditingItem(item); setCurrentView('add'); };
@@ -201,27 +197,9 @@ function App() {
     setCurrentView('list');
   };
 
-  // 1. ANIMATIE SCHERM (Toon dit ALLESBEHALVE als de animatie bezig is)
-  if (showKeyAnimation) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center animate-in fade-in duration-500">
-        <img 
-          src="/key.gif" 
-          alt="Toegang verlenen..." 
-          className="w-64 h-64 object-contain mb-4"
-        />
-        <p className="text-slate-400 text-sm font-medium animate-pulse">Toegang verlenen...</p>
-      </div>
-    );
-  }
-
-  // 2. LADEN
   if (loading && !session) return <div className="min-h-screen flex items-center justify-center text-blue-600">Laden...</div>;
-  
-  // 3. LOGIN SCHERM (Als er geen sessie is)
   if (!session) return <Login />;
 
-  // 4. DE APP (Als er wel sessie is en animatie is klaar)
   return (
     <Shell 
       onLogout={handleLogout} 
@@ -239,9 +217,7 @@ function App() {
                   <AlertTriangle size={28} />
                   <h2>Jaarwissel Opgelet!</h2>
                 </div>
-                <button onClick={() => setShowYearEndWarning(false)} className="text-slate-400 hover:text-slate-600">
-                  <X size={24} />
-                </button>
+                <button onClick={() => setShowYearEndWarning(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
               </div>
               <div className="space-y-4 text-slate-600">
                 <p>De jaarwisseling staat voor de deur.</p>
@@ -261,6 +237,7 @@ function App() {
           onNavigate={(viewId) => { if (viewId === 'add') startNew(); else setCurrentView(viewId as View); }} 
           onNavigateToList={navigateToList}
           userRole={userRole}
+          userProfile={userProfile} // <--- Geef profiel door aan Dashboard
         />
       )}
       
@@ -281,13 +258,7 @@ function App() {
       )}
       
       {currentView === 'add' && (
-        <SLAForm 
-          key={editingItem ? editingItem.id : 'new'} 
-          onBack={() => setCurrentView('home')} 
-          onSubmit={handleSaveSLA} 
-          initialData={editingItem} 
-          userRole={userRole}
-        />
+        <SLAForm key={editingItem ? editingItem.id : 'new'} onBack={() => setCurrentView('home')} onSubmit={handleSaveSLA} initialData={editingItem} userRole={userRole} />
       )}
       
       {currentView === 'settings' && (
@@ -296,6 +267,8 @@ function App() {
           onResetYear={handleYearReset}
           data={slaData}
           userRole={userRole}
+          userProfile={userProfile} // <--- Geef profiel door aan Settings
+          onProfileUpdate={() => session && fetchProfile(session.user.id)} // <--- Update functie
         />
       )}
     </Shell>
