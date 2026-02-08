@@ -16,19 +16,25 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
   onUpdate: () => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const isSalto = sla.category === 'Salto' || !sla.category;
-  const borderColor = isSalto ? 'hover:border-blue-300' : 'hover:border-emerald-300';
+  
+  // Kleur op basis van categorie
+  let themeClass = 'border-slate-200';
+  if (sla.category === 'Toegangscontrole') themeClass = 'hover:border-blue-300';
+  if (sla.category === 'Draaideurautomatisatie') themeClass = 'hover:border-orange-300';
+  if (sla.category === 'Poortautomatisatie') themeClass = 'hover:border-purple-300';
+  if (sla.category === 'Zonneweringen') themeClass = 'hover:border-yellow-300';
 
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all ${borderColor}`}>
+    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all ${themeClass}`}>
       <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-bold text-slate-900">{sla.clientName}</h3>
             {sla.vo_number && <span className="text-xs font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex items-center gap-1"><Hash size={10} /> {sla.vo_number}</span>}
+            
             {sla.isExecuted ? (
               sla.calculation_done ? (
-                <span className="flex items-center gap-1 text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full" title="Financieel afgerond"><CheckCircle2 size={12} /> Nacalculatie OK</span>
+                <span className="flex items-center gap-1 text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full" title="Financieel afgerond"><CheckCircle2 size={12} /> Afgerond</span>
               ) : (
                  <span className="flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><CheckCircle size={12} /> Uitgevoerd</span>
               )
@@ -36,12 +42,11 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
           </div>
           <div className="flex flex-wrap items-center gap-3 text-slate-500 text-sm">
             <span className="flex items-center gap-1"><MapPin size={14} /> {sla.city}</span>
-            {isSalto && <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${sla.type === 'Premium' ? 'bg-purple-100 text-purple-700' : sla.type === 'Comfort' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>{sla.type || 'Basic'}</span>}
-            {!isSalto && sla.renson_height && <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-emerald-100 text-emerald-700 flex items-center gap-1"><ArrowUpFromLine size={12} /> {sla.renson_height}</span>}
+            <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-slate-100 text-slate-700">{sla.category}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-           {!sla.isExecuted && userRole === 'technician' && (
+           {!sla.isExecuted && (
              <button onClick={(e) => { e.stopPropagation(); onExecute(sla); }} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1"><PlayCircle size={14} /> Uitvoeren</button>
            )}
            <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="p-2 text-slate-400 hover:text-slate-600">{expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
@@ -53,11 +58,8 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm mb-4">
             <div className="space-y-3">
               <div className="text-xs font-semibold text-slate-400 uppercase">Specificaties</div>
-              {isSalto ? (
-                <>{sla.type !== 'Basic' && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded || 'Geen materiaal info'}</div>}<div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u werk</div></>
-              ) : (
-                <><div className="flex items-center gap-2 text-slate-700"><User size={16} className="text-emerald-500"/> Installateur: {sla.renson_installer || '-'}</div>{sla.renson_size && <div className="flex items-center gap-2 text-slate-700"><Maximize size={16} className="text-emerald-500"/> Afmeting: {sla.renson_size}</div>}</>
-              )}
+              <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u voorzien</div>
+              {sla.partsNeeded && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded}</div>}
             </div>
             <div className="space-y-3">
               <div className="text-xs font-semibold text-slate-400 uppercase">Locatie & Planning</div>
@@ -99,7 +101,7 @@ interface SLAListProps {
 
 export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, initialFilter = 'all', userRole }: SLAListProps) => {
   const [filterStatus, setFilterStatus] = useState<ListFilterType>(initialFilter);
-  const [viewCategory, setViewCategory] = useState<SLACategory>('Salto');
+  const [viewCategory, setViewCategory] = useState<string>('Alle');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (initialFilter) setFilterStatus(initialFilter); }, [initialFilter]);
@@ -111,9 +113,9 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
     let nextMonth = currentMonth + 1; let monthAfter = currentMonth + 2;
     if (nextMonth > 12) nextMonth -= 12; if (monthAfter > 12) monthAfter -= 12;
 
-    result = result.filter(s => (s.category === viewCategory) || (!s.category && viewCategory === 'Salto'));
-    
-    // ALLE items blijven zichtbaar
+    if (viewCategory !== 'Alle') {
+        result = result.filter(s => s.category === viewCategory);
+    }
 
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -128,16 +130,26 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
     return result;
   }, [data, filterStatus, viewCategory, searchQuery]);
 
+  const categories = ['Alle', 'Toegangscontrole', 'Draaideurautomatisatie', 'Poortautomatisatie', 'Zonneweringen'];
+
   return (
     <div className="space-y-6">
        <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><ArrowLeft size={24} className="text-slate-600" /></button>
-        <div><h2 className="text-2xl font-bold text-slate-900">{filterStatus === 'critical' ? 'Kritieke Dossiers' : filterStatus === 'planning' ? 'Planning' : filterStatus === 'done' ? 'Uitgevoerd / Nacalculatie' : 'Alle Dossiers'} <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span></h2></div>
+        <div><h2 className="text-2xl font-bold text-slate-900">{filterStatus === 'critical' ? 'Kritieke Dossiers' : filterStatus === 'planning' ? 'Planning' : filterStatus === 'done' ? 'Uitgevoerd' : 'Alle Dossiers'} <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span></h2></div>
       </div>
 
-      <div className="flex bg-slate-100 p-1 rounded-xl">
-        <button onClick={() => setViewCategory('Salto')} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${viewCategory === 'Salto' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>SALTO</button>
-        <button onClick={() => setViewCategory('Renson')} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${viewCategory === 'Renson' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>RENSON</button>
+      {/* FILTER BUTTONS */}
+      <div className="flex overflow-x-auto gap-2 p-1">
+        {categories.map(cat => (
+            <button 
+                key={cat}
+                onClick={() => setViewCategory(cat)} 
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${viewCategory === cat ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            >
+                {cat}
+            </button>
+        ))}
       </div>
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
@@ -151,7 +163,7 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
       </div>
 
       <div className="grid gap-4">
-        {processedData.length === 0 && <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed"><p className="text-slate-500 font-medium">Geen dossiers gevonden in {viewCategory}.</p></div>}
+        {processedData.length === 0 && <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed"><p className="text-slate-500 font-medium">Geen dossiers gevonden.</p></div>}
         {processedData.map((sla) => <SLAItemCard key={sla.id} sla={sla} onEdit={onEdit} onDelete={onDelete} userRole={userRole} onUpdate={onRefresh} onExecute={onExecute} />)}
       </div>
     </div>

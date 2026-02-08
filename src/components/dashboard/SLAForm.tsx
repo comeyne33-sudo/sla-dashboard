@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2, Hash, ArrowUpFromLine, User, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Building, MapPin, Wrench, Calendar, CheckSquare, MessageSquare, Paperclip, X, FileText, Image as ImageIcon, Loader2, Hash, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import type { SLA, SLAType, Attachment, UserRole, SLACategory, DoorItem } from '../../types/sla';
 import { supabase } from '../../lib/supabase';
 
@@ -14,23 +14,17 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
   const isTechnician = userRole === 'technician';
 
   const [formData, setFormData] = useState({
-    category: (initialData?.category || 'Salto') as SLACategory,
+    category: (initialData?.category || 'Toegangscontrole') as SLACategory,
     vo_number: initialData?.vo_number || '',
-    
     clientName: initialData?.clientName || '',
     location: initialData?.location || '',
     city: initialData?.city || '',
     
-    // Salto specifiek
+    // Specifieke velden (hergebruikt waar nodig)
     type: (initialData?.type || 'Basic') as SLAType,
     partsNeeded: initialData?.partsNeeded || '',
     hoursRequired: initialData?.hoursRequired || 2,
     
-    // Renson specifiek
-    renson_height: initialData?.renson_height || 'Gelijkvloers',
-    renson_installer: initialData?.renson_installer || '',
-    renson_size: initialData?.renson_size || '',
-
     plannedMonth: initialData?.plannedMonth || 1, 
     contactName: initialData?.contactName || '',
     contactPhone: initialData?.contactPhone || '',
@@ -84,6 +78,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
     setFormData(prev => ({ ...prev, attachments: prev.attachments.filter((_, index) => index !== indexToRemove) }));
   };
 
+  // --- CSV IMPORT LOGICA (AANGEPAST) ---
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !initialData?.id) {
         alert("Sla het dossier eerst op voordat je deuren importeert.");
@@ -100,8 +95,29 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
 
       const lines = text.split('\n');
       const newDoors = lines
-        .map(line => line.split(/[;,]/)[0]?.trim())
-        .filter(name => name && name.length > 0 && name.toLowerCase() !== 'naam' && name.toLowerCase() !== 'name');
+        .map(line => {
+          // Split op komma, verwijder quotes indien nodig
+          const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+          if (cols.length < 2) return null; // Te weinig kolommen
+
+          // INDEX 1 = Naam (Deurnaam)
+          // INDEX 2 = Zone
+          // INDEX 7 = Status (Offline/Online)
+          const name = cols[1];
+          const zone = cols[2] || '';
+          const status = cols[7] || '';
+
+          if (!name || name.toLowerCase() === 'naam') return null; // Header skip
+
+          return {
+            sla_id: initialData.id,
+            door_name: name,
+            zone: zone,
+            connection_status: status,
+            status: 'pending'
+          };
+        })
+        .filter(item => item !== null);
 
       if (newDoors.length === 0) {
         alert("Geen geldige deuren gevonden in CSV.");
@@ -109,13 +125,8 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
         return;
       }
 
-      const insertData = newDoors.map(name => ({
-        sla_id: initialData.id,
-        door_name: name,
-        status: 'pending'
-      }));
-
-      const { error } = await supabase.from('sla_doors').insert(insertData);
+      // @ts-ignore (status type check)
+      const { error } = await supabase.from('sla_doors').insert(newDoors);
       
       if (error) {
         console.error(error);
@@ -145,6 +156,8 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
     { val: 10, label: 'Oktober' }, { val: 11, label: 'November' }, { val: 12, label: 'December' }
   ];
 
+  const categories: SLACategory[] = ['Toegangscontrole', 'Draaideurautomatisatie', 'Poortautomatisatie', 'Zonneweringen'];
+
   return (
     <div className="max-w-3xl mx-auto h-full overflow-y-auto pb-10">
       <div className="flex items-center gap-4 mb-6 sticky top-0 bg-slate-50 py-4 z-10">
@@ -161,33 +174,25 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         
-        {/* 1. CATEGORIE KEUZE */}
-        <div className="border-b border-slate-200">
-          <div className="grid grid-cols-2">
-            <button
-              type="button"
-              disabled={isTechnician || !!initialData}
-              onClick={() => setFormData({...formData, category: 'Salto'})}
-              className={`p-4 text-center font-bold transition-colors ${
-                formData.category === 'Salto' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              SALTO
-            </button>
-            <button
-              type="button"
-              disabled={isTechnician || !!initialData}
-              onClick={() => setFormData({...formData, category: 'Renson'})}
-              className={`p-4 text-center font-bold transition-colors ${
-                formData.category === 'Renson' 
-                  ? 'bg-emerald-600 text-white' 
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              RENSON
-            </button>
+        {/* CATEGORIE KEUZE */}
+        <div className="border-b border-slate-200 p-4 bg-slate-50">
+          <label className="block text-sm font-bold text-slate-700 mb-2">Selecteer Categorie</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                disabled={isTechnician}
+                onClick={() => setFormData({...formData, category: cat})}
+                className={`p-2 text-xs sm:text-sm font-bold rounded-lg transition-colors border ${
+                  formData.category === cat 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -260,36 +265,27 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
             </div>
           </div>
 
-          {/* DYNAMISCH BLOK: SPECIFIEKE DETAILS */}
-          <div className={`rounded-xl border p-4 ${formData.category === 'Salto' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'}`}>
-            <h3 className={`font-bold flex items-center gap-2 mb-4 ${formData.category === 'Salto' ? 'text-blue-800' : 'text-emerald-800'}`}>
+          {/* DYNAMISCH BLOK: TOEGANGSCONTROLE SPECIFIEK */}
+          <div className={`rounded-xl border p-4 ${formData.category === 'Toegangscontrole' ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
+            <h3 className={`font-bold flex items-center gap-2 mb-4 ${formData.category === 'Toegangscontrole' ? 'text-blue-800' : 'text-slate-800'}`}>
               <Wrench size={20} />
               Specificaties: {formData.category}
             </h3>
 
-            {/* IF SALTO */}
-            {formData.category === 'Salto' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-blue-900 mb-1">Type Contract</label>
-                  <select disabled={isTechnician} className="w-full p-2.5 border border-blue-200 rounded-lg bg-white" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SLAType})}>
-                    <option value="Basic">Basic (Software update only)</option>
-                    <option value="Comfort">Comfort</option>
-                    <option value="Premium">Premium</option>
-                  </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-1">Benodigde Onderdelen</label>
+                  <input type="text" disabled={isTechnician} className="w-full p-2 border border-slate-200 rounded-lg" value={formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-blue-900 mb-1">Benodigde Onderdelen</label>
-                  <input type="text" disabled={isTechnician || formData.type === 'Basic'} className="w-full p-2 border border-blue-200 rounded-lg" value={formData.type === 'Basic' ? '' : formData.partsNeeded} onChange={e => setFormData({...formData, partsNeeded: e.target.value})} />
+                  <label className="block text-sm font-medium text-slate-900 mb-1">Geschatte Uren</label>
+                  <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-slate-200 rounded-lg" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-blue-900 mb-1">Geschatte Uren</label>
-                  <input type="number" step="0.5" disabled={isTechnician} className="w-full p-2 border border-blue-200 rounded-lg" value={formData.hoursRequired} onChange={e => setFormData({...formData, hoursRequired: parseFloat(e.target.value) || 0})} />
-                </div>
-                
-                {/* --- CSV DEURLIJST IMPORT --- */}
-                {initialData && !isTechnician && (
-                  <div className="md:col-span-2 mt-4 pt-4 border-t border-blue-200">
+            </div>
+
+            {/* --- CSV DEURLIJST IMPORT (ALLEEN BIJ TOEGANGSCONTROLE) --- */}
+            {initialData && formData.category === 'Toegangscontrole' && !isTechnician && (
+                  <div className="mt-4 pt-4 border-t border-blue-200">
                     <label className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                        <FileSpreadsheet size={18} /> Deurlijst (CSV Import)
                     </label>
@@ -306,12 +302,12 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                              </button>
                            </div>
                            <div className="max-h-32 overflow-y-auto bg-slate-50 p-2 rounded border border-slate-100 text-sm text-slate-600">
-                              {doors.map((d, i) => <div key={i} className="truncate">{i+1}. {d.door_name}</div>)}
+                              {doors.map((d, i) => <div key={i} className="truncate">{i+1}. {d.door_name} ({d.zone})</div>)}
                            </div>
                         </div>
                       ) : (
                         <div className="text-center py-4">
-                           <p className="text-sm text-slate-500 mb-3">Upload een .csv bestand (1e kolom = naam)</p>
+                           <p className="text-sm text-slate-500 mb-3">Upload de deurenlijst (.csv)</p>
                            <label className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg cursor-pointer hover:bg-blue-200 transition-colors ${importingDoors ? 'opacity-50' : ''}`}>
                              {importingDoors ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
                              <span>CSV Selecteren</span>
@@ -321,35 +317,6 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* IF RENSON */}
-            {formData.category === 'Renson' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
-                    <User size={14} /> Installateur
-                  </label>
-                  <input type="text" disabled={isTechnician} className="w-full p-2 border border-emerald-200 rounded-lg" placeholder="bv. Ramen & Deuren BV" value={formData.renson_installer} onChange={e => setFormData({...formData, renson_installer: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-emerald-900 mb-1 flex items-center gap-1">
-                     <ArrowUpFromLine size={14} /> Hoogte (Verdiep)
-                  </label>
-                  <select disabled={isTechnician} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white" value={formData.renson_height} onChange={e => setFormData({...formData, renson_height: e.target.value})}>
-                    <option value="Gelijkvloers">Gelijkvloers</option>
-                    <option value="Verdiep 1">Verdiep 1</option>
-                    <option value="Verdiep 2">Verdiep 2</option>
-                    <option value="Verdiep 3+">Verdiep 3+</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-emerald-900 mb-1">Grootte Screen (Optioneel)</label>
-                  <input type="text" disabled={isTechnician} className="w-full p-2 border border-emerald-200 rounded-lg" placeholder="bv. 4m x 2m" value={formData.renson_size} onChange={e => setFormData({...formData, renson_size: e.target.value})} />
-                </div>
-              </div>
             )}
           </div>
 
@@ -378,7 +345,7 @@ export const SLAForm = ({ onBack, onSubmit, initialData, userRole }: SLAFormProp
           {/* COMMENTS & ATTACHMENTS */}
           <div className="space-y-4">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2 border-b pb-2"><MessageSquare size={18} className="text-slate-500" /> Opmerkingen & Foto's</h3>
-            <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Opmerkingen..." />
+            <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[100px]" value={formData.comments} onChange={e => setFormData({...formData, comments: e.target.value})} placeholder="Interne opmerkingen voor technieker..." />
             
             <div className="space-y-3">
               <div className="flex items-center gap-3">
