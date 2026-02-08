@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Loader2, MapPin, Hash, MessageSquare, PenTool, Printer, Check, XCircle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, MapPin, Hash, MessageSquare, PenTool, Printer, CheckCircle, XCircle, Cloud } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { SLA, DoorItem } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
@@ -28,7 +28,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
-    // Alleen deuren ophalen als het Toegangscontrole is
     if (sla.category === 'Toegangscontrole') {
         fetchDoors();
     } else {
@@ -42,12 +41,37 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
     setLoading(false);
   };
 
-  // Functie om deur checkbox te updaten
   const toggleDoorCheck = (id: string, field: 'check_battery' | 'check_rights' | 'check_firmware') => {
     setDoors(doors.map(d => d.id === id ? { ...d, [field]: !d[field] } : d));
   };
 
   const updateDoorRemark = (id: string, text: string) => setDoors(doors.map(d => d.id === id ? { ...d, remarks: text } : d));
+
+  // --- NIEUW: TUSSENTIJDS OPSLAAN ---
+  const handleSaveProgress = async () => {
+    setSaving(true);
+    try {
+      // 1. Deuren opslaan (indien van toepassing)
+      if (sla.category === 'Toegangscontrole' && doors.length > 0) {
+        await supabase.from('sla_doors').upsert(doors);
+      }
+
+      // 2. SLA Data opslaan (zonder isExecuted te zetten!)
+      await supabase.from('slas').update({
+        comments: generalComments,
+        execution_report: executionReport,
+        lastUpdate: new Date().toLocaleDateString('nl-BE'),
+      }).eq('id', sla.id);
+
+      alert("Voortgang is opgeslagen. U kunt later verdergaan.");
+      onBack(); // Keer terug naar de lijst
+    } catch (error) {
+      console.error(error);
+      alert("Fout bij tussentijds opslaan.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handlePreFinish = () => {
     setShowSignModal(true);
@@ -63,7 +87,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('signatures').getPublicUrl(fileName);
 
-      // Sla deuren op als het Toegangscontrole is
       if (sla.category === 'Toegangscontrole' && doors.length > 0) {
         await supabase.from('sla_doors').upsert(doors);
       }
@@ -71,7 +94,7 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
       await supabase.from('slas').update({
         isExecuted: true,
         comments: generalComments,
-        execution_report: executionReport, // Opslaan van het tekstverslag
+        execution_report: executionReport,
         lastUpdate: new Date().toLocaleDateString('nl-BE'),
         signer_name: signerName,
         signature_url: publicUrl
@@ -82,14 +105,12 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
     } catch (error) { console.error(error); alert("Fout bij opslaan."); setSaving(false); }
   };
 
-  // --- WERK BON GENERATOR ---
   const generateWorkOrder = (sigUrl: string) => {
     const printWindow = window.open('', '', 'height=800,width=900');
     if (!printWindow) return;
 
     let contentHtml = '';
 
-    // CONTROLE: TABEL OF TEKST?
     if (sla.category === 'Toegangscontrole') {
         const rows = doors.map(d => `
             <tr style="border-bottom: 1px solid #eee;">
@@ -117,7 +138,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
             </table>
         `;
     } else {
-        // Andere categorieën: Tekstverslag
         contentHtml = `
             <h3>Uitgevoerde Werken</h3>
             <div style="background:#f9fafb; padding:15px; border:1px solid #e5e7eb; border-radius:8px; min-height:100px; white-space: pre-wrap;">
@@ -130,7 +150,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
       <html>
         <head><title>Werkbon - ${sla.clientName}</title></head>
         <body style="font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1f2937; max-width: 800px; margin: 0 auto;">
-          
           <div style="display:flex; align-items:center; justify-content:space-between; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px;">
              <div>
                 <h1 style="margin:0; color:#111827; font-size: 24px;">Santens Automatics</h1>
@@ -141,7 +160,6 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
                 <p>Ref: ${sla.vo_number || '-'}</p>
              </div>
           </div>
-
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
              <div style="background:#f9fafb; padding:15px; border-radius:8px;">
                 <strong style="display:block; margin-bottom:5px; color:#374151;">Klantlocatie</strong>
@@ -155,28 +173,18 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
                 ${sla.category}
              </div>
           </div>
-
           ${contentHtml}
-
           <div style="margin-top: 50px; page-break-inside: avoid;">
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                <div>
-                    <p style="font-size:12px; font-weight:bold; text-transform:uppercase; color:#9ca3af; margin-bottom:10px;">Voor uitvoerder:</p>
-                    <p style="font-weight:bold;">Santens Automatics</p>
-                </div>
-                <div>
-                    <p style="font-size:12px; font-weight:bold; text-transform:uppercase; color:#9ca3af; margin-bottom:10px;">Voor akkoord klant:</p>
-                    <p style="font-weight:bold; margin-bottom:5px;">${signerName}</p>
-                    <img src="${sigUrl}" style="max-height: 60px; border-bottom: 1px solid #000;" />
-                </div>
+                <div><p style="font-size:12px; font-weight:bold; text-transform:uppercase; color:#9ca3af; margin-bottom:10px;">Voor uitvoerder:</p><p style="font-weight:bold;">Santens Automatics</p></div>
+                <div><p style="font-size:12px; font-weight:bold; text-transform:uppercase; color:#9ca3af; margin-bottom:10px;">Voor akkoord klant:</p><p style="font-weight:bold; margin-bottom:5px;">${signerName}</p><img src="${sigUrl}" style="max-height: 60px; border-bottom: 1px solid #000;" /></div>
             </div>
           </div>
-
         </body>
       </html>
     `);
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500); // Korte timeout voor laden afbeelding
+    setTimeout(() => printWindow.print(), 500);
   };
 
   if (loading) return <div className="p-10 text-center">Laden...</div>;
@@ -191,44 +199,22 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
       </div>
 
       <div className="space-y-6 px-4">
-        
-        {/* CONDITIE: TOEGANGSCONTROLE KRIJGT TABEL, ANDEREN TEKSTVAK */}
         {sla.category === 'Toegangscontrole' ? (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Deurlijst Controle</h3>
-                    <span className="text-xs bg-white border px-2 py-1 rounded-full text-slate-500">{doors.length} deuren</span>
-                </div>
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center"><h3 className="font-bold text-slate-800">Deurlijst Controle</h3><span className="text-xs bg-white border px-2 py-1 rounded-full text-slate-500">{doors.length} deuren</span></div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 font-medium">
-                            <tr>
-                                <th className="p-3 w-1/3">Deur / Zone</th>
-                                <th className="p-3 text-center">Batt.</th>
-                                <th className="p-3 text-center">Rechten</th>
-                                <th className="p-3 text-center">FW</th>
-                                <th className="p-3">Opmerking</th>
-                            </tr>
+                            <tr><th className="p-3 w-1/3">Deur / Zone</th><th className="p-3 text-center">Batt.</th><th className="p-3 text-center">Rechten</th><th className="p-3 text-center">FW</th><th className="p-3">Opmerking</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {doors.map(door => (
                                 <tr key={door.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3">
-                                        <div className="font-medium text-slate-900">{door.door_name}</div>
-                                        <div className="text-xs text-slate-500">{door.zone}</div>
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_battery || false} onChange={() => toggleDoorCheck(door.id, 'check_battery')} />
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_rights || false} onChange={() => toggleDoorCheck(door.id, 'check_rights')} />
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_firmware || false} onChange={() => toggleDoorCheck(door.id, 'check_firmware')} />
-                                    </td>
-                                    <td className="p-3">
-                                        <input type="text" className="w-full p-1.5 border border-slate-200 rounded text-xs focus:border-blue-300 outline-none" placeholder="..." value={door.remarks || ''} onChange={e => updateDoorRemark(door.id, e.target.value)} />
-                                    </td>
+                                    <td className="p-3"><div className="font-medium text-slate-900">{door.door_name}</div><div className="text-xs text-slate-500">{door.zone}</div></td>
+                                    <td className="p-3 text-center"><input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_battery || false} onChange={() => toggleDoorCheck(door.id, 'check_battery')} /></td>
+                                    <td className="p-3 text-center"><input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_rights || false} onChange={() => toggleDoorCheck(door.id, 'check_rights')} /></td>
+                                    <td className="p-3 text-center"><input type="checkbox" className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" checked={door.check_firmware || false} onChange={() => toggleDoorCheck(door.id, 'check_firmware')} /></td>
+                                    <td className="p-3"><input type="text" className="w-full p-1.5 border border-slate-200 rounded text-xs focus:border-blue-300 outline-none" placeholder="..." value={door.remarks || ''} onChange={e => updateDoorRemark(door.id, e.target.value)} /></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -239,50 +225,34 @@ export const ExecutionView = ({ sla, onBack, onFinish }: ExecutionViewProps) => 
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-3">
                 <h3 className="font-bold text-slate-900 flex items-center gap-2"><PenTool size={20} className="text-blue-600" /> Uitgevoerde Werken</h3>
                 <p className="text-sm text-slate-500">Beschrijf hieronder gedetailleerd welke werkzaamheden zijn uitgevoerd.</p>
-                <textarea 
-                    className="w-full p-4 border border-slate-300 rounded-lg min-h-[200px] text-slate-700 leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" 
-                    placeholder="- Motor afgeregeld&#10;- Sensoren gereinigd&#10;- Testcyclus OK..." 
-                    value={executionReport}
-                    onChange={e => setExecutionReport(e.target.value)}
-                />
+                <textarea className="w-full p-4 border border-slate-300 rounded-lg min-h-[200px] text-slate-700 leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" placeholder="- Motor afgeregeld&#10;- Sensoren gereinigd&#10;- Testcyclus OK..." value={executionReport} onChange={e => setExecutionReport(e.target.value)} />
             </div>
         )}
 
-        {/* FOTO & INTERNE OPMERKINGEN (Voor iedereen) */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
-          <div className="flex items-center justify-between">
-             <h3 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare size={20} className="text-orange-500" /> Interne Opmerkingen & Foto's</h3>
-             <AttachmentManager sla={sla} onUpdate={() => setUpdateTrigger(n => n + 1)} />
-          </div>
+          <div className="flex items-center justify-between"><h3 className="font-bold text-slate-900 flex items-center gap-2"><MessageSquare size={20} className="text-orange-500" /> Interne Opmerkingen & Foto's</h3><AttachmentManager sla={sla} onUpdate={() => setUpdateTrigger(n => n + 1)} /></div>
           <textarea className="w-full p-3 border border-slate-300 rounded-lg min-h-[80px] text-sm" placeholder="Opmerkingen voor intern gebruik..." value={generalComments} onChange={e => setGeneralComments(e.target.value)} />
         </div>
       </div>
 
-      {/* FOOTER */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg z-20">
-         <div className="max-w-3xl mx-auto"><button onClick={handlePreFinish} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:bg-blue-700 flex items-center justify-center gap-2"><Save size={20} /> Naar Aftekenen</button></div>
+      {/* FOOTER MET TWEE KNOPPEN */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-lg z-20 flex flex-col sm:flex-row gap-3 justify-center max-w-4xl mx-auto">
+         <button onClick={handleSaveProgress} disabled={saving} className="flex-1 py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 flex items-center justify-center gap-2 transition-colors">
+            {saving ? <Loader2 className="animate-spin" /> : <Cloud size={20} />} Tussentijds Opslaan
+         </button>
+         <button onClick={handlePreFinish} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors">
+            <Save size={20} /> Naar Aftekenen
+         </button>
       </div>
 
-      {/* AFTEKEN MODAL */}
       {showSignModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-lg flex items-center gap-2"><PenTool size={18} /> Werkbon Aftekenen</h3>
-              <button onClick={() => setShowSignModal(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
-            </div>
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-lg flex items-center gap-2"><PenTool size={18} /> Werkbon Aftekenen</h3><button onClick={() => setShowSignModal(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button></div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Naam Contactpersoon</label>
-                <input type="text" className="w-full p-3 border border-slate-300 rounded-lg" placeholder="Naam klant..." value={signerName} onChange={e => setSignerName(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Handtekening</label>
-                <SignaturePad onEnd={setSignatureBlob} />
-              </div>
-              <button onClick={handleFinalSave} disabled={saving} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 flex items-center justify-center gap-2 shadow-sm mt-4">
-                {saving ? <Loader2 className="animate-spin" /> : <Printer size={20} />} Opslaan & Printen
-              </button>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Naam Contactpersoon</label><input type="text" className="w-full p-3 border border-slate-300 rounded-lg" placeholder="Naam klant..." value={signerName} onChange={e => setSignerName(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Handtekening</label><SignaturePad onEnd={setSignatureBlob} /></div>
+              <button onClick={handleFinalSave} disabled={saving} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 flex items-center justify-center gap-2 shadow-sm mt-4">{saving ? <Loader2 className="animate-spin" /> : <Printer size={20} />} Opslaan & Printen</button>
             </div>
           </div>
         </div>

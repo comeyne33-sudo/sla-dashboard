@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Hash, ArrowUpFromLine, Maximize, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Hash, ArrowUpFromLine, Maximize, PlayCircle, CheckCircle2, RotateCw } from 'lucide-react';
 import type { SLA, SLAType, UserRole, SLACategory } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +24,11 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
   if (sla.category === 'Poortautomatisatie') themeClass = 'hover:border-purple-300';
   if (sla.category === 'Zonneweringen') themeClass = 'hover:border-yellow-300';
 
+  const isSalto = sla.category === 'Toegangscontrole'; // Voor specifieke iconen
+
+  // Check of de SLA al gestart is (bevat tekst, maar niet afgerond)
+  const isStarted = !sla.isExecuted && (!!sla.execution_report || !!sla.comments);
+
   return (
     <div className={`bg-white rounded-xl border border-slate-200 shadow-sm transition-all ${themeClass}`}>
       <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center cursor-pointer" onClick={() => setExpanded(!expanded)}>
@@ -47,7 +52,12 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
         </div>
         <div className="flex items-center gap-2">
            {!sla.isExecuted && (
-             <button onClick={(e) => { e.stopPropagation(); onExecute(sla); }} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center gap-1"><PlayCircle size={14} /> Uitvoeren</button>
+             <button 
+                onClick={(e) => { e.stopPropagation(); onExecute(sla); }} 
+                className={`px-3 py-1.5 text-white text-sm font-medium rounded-lg flex items-center gap-1 transition-colors ${isStarted ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+             >
+                {isStarted ? <><RotateCw size={14} /> Hervatten</> : <><PlayCircle size={14} /> Uitvoeren</>}
+             </button>
            )}
            <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} className="p-2 text-slate-400 hover:text-slate-600">{expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
         </div>
@@ -60,6 +70,7 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
               <div className="text-xs font-semibold text-slate-400 uppercase">Specificaties</div>
               <div className="flex items-center gap-2 text-slate-700"><Clock size={16} className="text-blue-500"/> {sla.hoursRequired}u voorzien</div>
               {sla.partsNeeded && <div className="flex items-center gap-2 text-slate-700"><Battery size={16} className="text-orange-500"/> {sla.partsNeeded}</div>}
+              {isSalto && sla.type && <div className="flex items-center gap-2 text-slate-700 font-medium">Type: {sla.type}</div>}
             </div>
             <div className="space-y-3">
               <div className="text-xs font-semibold text-slate-400 uppercase">Locatie & Planning</div>
@@ -139,7 +150,6 @@ export const SLAList = ({ data, onBack, onDelete, onEdit, onRefresh, onExecute, 
         <div><h2 className="text-2xl font-bold text-slate-900">{filterStatus === 'critical' ? 'Kritieke Dossiers' : filterStatus === 'planning' ? 'Planning' : filterStatus === 'done' ? 'Uitgevoerd' : 'Alle Dossiers'} <span className="ml-2 text-slate-500 font-normal">({processedData.length})</span></h2></div>
       </div>
 
-      {/* FILTER BUTTONS */}
       <div className="flex overflow-x-auto gap-2 p-1">
         {categories.map(cat => (
             <button 
