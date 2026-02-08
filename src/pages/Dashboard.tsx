@@ -23,9 +23,12 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
     else setGreeting('Goedenavond');
   }, []);
   
+  // TELLERS VOOR DE 4 NIEUWE CATEGORIEËN
   const totalCount = safeData.length;
-  const saltoCount = safeData.filter(s => s.category === 'Salto' || !s.category).length;
-  const rensonCount = safeData.filter(s => s.category === 'Renson').length;
+  const accessCount = safeData.filter(s => s.category === 'Toegangscontrole').length;
+  const doorCount = safeData.filter(s => s.category === 'Draaideurautomatisatie').length;
+  const gateCount = safeData.filter(s => s.category === 'Poortautomatisatie').length;
+  const sunCount = safeData.filter(s => s.category === 'Zonneweringen').length;
 
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
@@ -64,8 +67,15 @@ export const Dashboard = ({ data, onNavigate, onNavigateToList, userRole, userPr
             {greeting}, <span className="text-blue-600">{userProfile?.display_name || (userRole === 'admin' ? 'Beheerder' : 'Technieker')}</span>
           </h1>
           <p className="text-slate-500 text-lg mt-2">
-            SLA's op de teller: <span className="font-bold text-slate-900">{totalCount}</span>, waarvan <span className="font-bold text-blue-600">{saltoCount}</span> voor Salto en <span className="font-bold text-emerald-600">{rensonCount}</span> voor Renson.
+            SLA's op de teller: <span className="font-bold text-slate-900">{totalCount}</span>.
           </p>
+          {/* Overzicht per categorie */}
+          <div className="flex flex-wrap gap-3 mt-3 text-sm font-medium text-slate-600">
+             <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">{accessCount} Toegangscontrole</span>
+             <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded border border-orange-100">{doorCount} Draaideuren</span>
+             <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100">{gateCount} Poorten</span>
+             <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded border border-yellow-100">{sunCount} Zonwering</span>
+          </div>
         </header>
 
         {/* KPI Grid */}

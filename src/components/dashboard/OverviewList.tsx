@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Hash, ArrowUpFromLine, Maximize, PlayCircle, CheckCircle2, RotateCw } from 'lucide-react';
-import type { SLA, SLAType, UserRole, SLACategory } from '../../types/sla';
+import { ArrowLeft, Battery, Calendar, Clock, Euro, MapPin, Phone, User, Trash2, Pencil, CheckCircle, AlertCircle, Search, MessageSquare, RotateCcw, ChevronDown, ChevronUp, Hash, ArrowUpFromLine, Maximize, PlayCircle, CheckCircle2, RotateCw, Printer, Loader2 } from 'lucide-react';
+import type { SLA, DoorItem, UserRole, SLACategory } from '../../types/sla';
 import { AttachmentManager } from './AttachmentManager';
 import { supabase } from '../../lib/supabase';
+import { generateAndPrintWorkOrder } from '../../lib/printWorkOrder'; // <--- NIEUW: Importeer de helper
 
 type ListFilterType = 'all' | 'critical' | 'planning' | 'done';
 const monthNames = [ "", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December" ];
@@ -16,6 +17,26 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
   onUpdate: () => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [printing, setPrinting] = useState(false); // State voor laad-icoon tijdens printen
+
+  // Functie om werkbon op te halen en te printen
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+        let doors: DoorItem[] = [];
+        // Alleen deuren ophalen als het Toegangscontrole is
+        if (sla.category === 'Toegangscontrole') {
+            const { data } = await supabase.from('sla_doors').select('*').eq('sla_id', sla.id).order('created_at', { ascending: true });
+            if (data) doors = data as DoorItem[];
+        }
+        generateAndPrintWorkOrder(sla, doors);
+    } catch (error) {
+        console.error(error);
+        alert("Kon werkbon niet genereren.");
+    } finally {
+        setPrinting(false);
+    }
+  };
   
   // Kleur op basis van categorie
   let themeClass = 'border-slate-200';
@@ -24,9 +45,7 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
   if (sla.category === 'Poortautomatisatie') themeClass = 'hover:border-purple-300';
   if (sla.category === 'Zonneweringen') themeClass = 'hover:border-yellow-300';
 
-  const isSalto = sla.category === 'Toegangscontrole'; // Voor specifieke iconen
-
-  // Check of de SLA al gestart is (bevat tekst, maar niet afgerond)
+  const isSalto = sla.category === 'Toegangscontrole';
   const isStarted = !sla.isExecuted && (!!sla.execution_report || !!sla.comments);
 
   return (
@@ -51,6 +70,17 @@ const SLAItemCard = ({ sla, onEdit, onDelete, userRole, onUpdate, onExecute }: {
           </div>
         </div>
         <div className="flex items-center gap-2">
+           {/* KNOP: PRINT WERKBON (Alleen als uitgevoerd) */}
+           {sla.isExecuted && (
+             <button 
+                onClick={(e) => { e.stopPropagation(); handlePrint(); }} 
+                className="px-3 py-1.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 flex items-center gap-1 transition-colors border border-slate-200"
+                disabled={printing}
+             >
+                {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Werkbon
+             </button>
+           )}
+
            {!sla.isExecuted && (
              <button 
                 onClick={(e) => { e.stopPropagation(); onExecute(sla); }} 
